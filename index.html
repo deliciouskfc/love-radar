@@ -96,6 +96,72 @@ body{
 .hint a{color:var(--purple2);text-decoration:none;border-bottom:1px dashed rgba(192,132,252,.5);transition:.2s}
 .hint a:hover{color:var(--pink2);border-bottom-color:var(--pink2);text-shadow:0 0 10px rgba(255,95,162,.5)}
 
+/* ========== 邀请码通道 ========== */
+.invite-box{
+  position:relative;border-radius:18px;padding:22px 24px;margin:18px 0 0;
+  background:
+    linear-gradient(135deg,rgba(139,92,246,.14),rgba(255,95,162,.08) 55%,rgba(0,0,0,.25));
+  border:1px solid transparent;
+  background-clip:padding-box;
+  box-shadow:0 8px 30px rgba(80,40,160,.18),inset 0 1px 0 rgba(255,255,255,.06);
+}
+.invite-box::before{
+  content:"";position:absolute;inset:0;border-radius:18px;padding:1px;
+  background:linear-gradient(135deg,rgba(192,132,252,.6),rgba(255,95,162,.35) 60%,rgba(192,132,252,.08));
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none;
+}
+.invite-form{display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap}
+.invite-kicker{font-size:10.5px;letter-spacing:3px;font-weight:700;
+  background:linear-gradient(90deg,#c084fc,#ff5fa2);-webkit-background-clip:text;background-clip:text;color:transparent}
+.invite-name{font-size:17px;font-weight:700;letter-spacing:2px;margin-top:7px;color:#f1e9ff}
+.invite-desc{font-size:12px;color:var(--muted);margin-top:4px;letter-spacing:.5px}
+.invite-actions{display:flex;gap:10px;align-items:stretch}
+.invite-actions input{
+  width:148px;padding:11px 14px;border-radius:11px;font-size:14px;letter-spacing:4px;text-align:center;
+  color:var(--text);background:rgba(0,0,0,.4);
+  border:1px solid rgba(192,132,252,.35);outline:none;transition:.2s;
+}
+.invite-actions input:focus{border-color:var(--pink);box-shadow:0 0 14px rgba(255,95,162,.35)}
+.btn-invite{
+  padding:0 26px;border-radius:11px;cursor:pointer;font-size:13.5px;letter-spacing:3px;font-weight:700;color:#fff;
+  border:none;background:linear-gradient(135deg,#8b5cf6 0%,#d946ef 55%,#ff5fa2 100%);
+  box-shadow:0 6px 20px rgba(217,70,239,.4),inset 0 1px 0 rgba(255,255,255,.25);
+  transition:transform .15s,box-shadow .2s,filter .2s;white-space:nowrap;
+}
+.btn-invite:hover{filter:brightness(1.1);box-shadow:0 8px 26px rgba(217,70,239,.55)}
+.btn-invite:active{transform:translateY(1px) scale(.98)}
+.invite-divider{display:flex;align-items:center;gap:12px;margin:20px 0 4px;color:var(--muted)}
+.invite-divider::before,.invite-divider::after{content:"";flex:1;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(192,132,252,.3),transparent)}
+.invite-divider span{font-size:11px;letter-spacing:3px}
+/* 激活态 */
+.invite-active{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.ia-left{display:flex;align-items:center;gap:14px}
+.ia-pulse{width:12px;height:12px;border-radius:50%;display:inline-grid;place-items:center;
+  background:rgba(52,211,153,.18)}
+.ia-pulse i{width:8px;height:8px;border-radius:50%;background:#34d399;
+  box-shadow:0 0 0 0 rgba(52,211,153,.6);animation:iaping 1.8s infinite}
+@keyframes iaping{
+  0%{box-shadow:0 0 0 0 rgba(52,211,153,.55)}
+  70%{box-shadow:0 0 0 9px rgba(52,211,153,0)}
+  100%{box-shadow:0 0 0 0 rgba(52,211,153,0)}
+}
+.ia-title{font-size:15px;font-weight:700;letter-spacing:1.5px;color:#eafff5}
+.ia-sub{font-size:11.5px;color:var(--muted);margin-top:3px;letter-spacing:.5px}
+.btn-mini{padding:8px 16px;border-radius:10px;cursor:pointer;font-size:12px;letter-spacing:2px;
+  border:1px solid rgba(148,163,184,.35);color:#c7d2e0;background:rgba(148,163,184,.08);transition:.2s}
+.btn-mini:hover{background:rgba(148,163,184,.18);color:#fff}
+/* 锁定后：自有 API 区块收起 */
+.cfg-locked #ownApi,.cfg-locked .invite-divider{display:none}
+.cfg-locked{padding-bottom:10px}
+@media(max-width:560px){
+  .invite-box{padding:18px}
+  .invite-form{flex-direction:column;align-items:stretch}
+  .invite-actions{width:100%}
+  .invite-actions input{flex:1;width:auto}
+}
+
 /* ========== 上传区 ========== */
 .dropzone{
   border:2px dashed rgba(255,95,162,.4);border-radius:16px;padding:38px 20px;text-align:center;
@@ -319,9 +385,39 @@ footer{text-align:center;margin-top:56px;color:rgba(185,168,217,.5);font-size:12
   </div>
 
   <!-- 步骤1 API 配置 -->
-  <div class="card">
+  <div class="card" id="cfgCard">
     <h2><span class="num">1</span>配置图像分析 API</h2>
-    <div class="sub">填入你自己的大模型 API（OpenAI 兼容格式），Key 仅保存在本地浏览器，不会上传到任何服务器</div>
+    <div class="sub">方式一：输入邀请码一键激活；方式二：填入你自己的大模型 API（Key 仅保存在本地浏览器）</div>
+
+    <!-- 邀请码通道 -->
+    <div class="invite-box" id="inviteBox">
+      <div id="inviteForm" class="invite-form">
+        <div class="invite-meta">
+          <div class="invite-kicker">INVITE ACCESS</div>
+          <div class="invite-name">邀请码通道</div>
+          <div class="invite-desc">激活后自动配置模型与授权，无需自备 API Key</div>
+        </div>
+        <div class="invite-actions">
+          <input id="inviteCode" type="text" inputmode="numeric" placeholder="六位邀请码" maxlength="6"
+            autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false">
+          <button type="button" id="inviteBtn" class="btn-invite">激 活</button>
+        </div>
+      </div>
+      <div id="inviteActive" class="invite-active" style="display:none">
+        <div class="ia-left">
+          <span class="ia-pulse"><i></i></span>
+          <div>
+            <div class="ia-title">邀请通道已激活</div>
+            <div class="ia-sub">qwen3.8-max · 服务端安全授权 · 配置已锁定</div>
+          </div>
+        </div>
+        <button type="button" id="inviteExit" class="btn-mini">退出通道</button>
+      </div>
+    </div>
+
+    <div class="invite-divider"><span>或使用自有 API</span></div>
+
+    <div id="ownApi">
     <div class="field">
       <label>平台预设（选择后自动填充地址与模型）</label>
       <select id="preset">
@@ -356,6 +452,7 @@ footer{text-align:center;margin-top:56px;color:rgba(185,168,217,.5);font-size:12
       推荐：<b>qwen-vl-max-latest</b>（中文截图识别最准）· <b>glm-4v-flash</b>（免费）· <b>doubao-vision-pro-32k</b> · <b>moonshot-v1-32k-vision-preview</b> · <b>gpt-4o</b> · <b>gemini-2.5-flash</b><br>
       <span style="color:var(--pink2)">注意：</span>模型必须支持<b>图片输入（视觉/VL）</b>，纯文本模型（如 deepseek-chat）无法使用。
     </div>
+    </div><!-- /ownApi -->
   </div>
 
   <!-- 步骤2 上传 -->
@@ -506,7 +603,44 @@ function saveCfg(){
   }catch(e){}
 })();
 
-/* ================= 图片上传 ================= */
+/* ================= 邀请码通道（Supabase 安全中转） ================= */
+const EDGE_URL='https://ralskeiwruwvdpyioebt.supabase.co/functions/v1/chat';
+const INVITE_CODE='350234';
+let proxyMode=false;
+/* 激活：锁定配置、填入中转地址与模型，上游 Key 永不下发 */
+function applyProxy(){
+  proxyMode=true;
+  $('cfgCard').classList.add('cfg-locked');
+  $('preset').value='custom';
+  $('baseUrl').value=EDGE_URL;
+  $('model').value='qwen3.8-max';
+  $('apiKey').value='';
+  ['preset','baseUrl','model','apiKey'].forEach(id=>$(id).setAttribute('disabled',''));
+  $('inviteForm').style.display='none';
+  $('inviteActive').style.display='flex';
+  localStorage.setItem('loveRadarInvite','1');
+}
+/* 退出通道：恢复自有 API 配置 */
+function exitProxy(){
+  proxyMode=false;
+  $('cfgCard').classList.remove('cfg-locked');
+  $('baseUrl').value='';$('model').value='';$('apiKey').value='';
+  ['preset','baseUrl','model','apiKey'].forEach(id=>$(id).removeAttribute('disabled'));
+  $('inviteForm').style.display='flex';
+  $('inviteActive').style.display='none';
+  $('inviteCode').value='';
+  localStorage.removeItem('loveRadarInvite');
+  saveCfg();
+}
+$('inviteBtn').addEventListener('click',()=>{
+  const v=($('inviteCode').value||'').replace(/\s/g,'');
+  $('inviteCode').value=v;
+  if(v===INVITE_CODE){applyProxy();toast('邀请通道已激活');}
+  else toast('邀请码无效，请核对后重试');
+});
+$('inviteCode').addEventListener('keydown',e=>{if(e.key==='Enter')$('inviteBtn').click()});
+$('inviteExit').addEventListener('click',exitProxy);
+if(localStorage.getItem('loveRadarInvite')==='1')applyProxy();
 let images=[]; // {dataUrl}
 const dz=$('dropzone');
 dz.addEventListener('click',()=>$('fileInput').click());
@@ -568,16 +702,25 @@ function termClear(title){
   if(title)$('termTitle').textContent=title;
 }
 async function chat({messages,maxTokens=8000,temperature=.7,onToken}){
-  const base=$('baseUrl').value.trim().replace(/\/+$/,'');
-  const key=$('apiKey').value.trim();
-  const model=$('model').value.trim();
   let resp;
   try{
-    resp=await fetch(base+'/chat/completions',{
-      method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
-      body:JSON.stringify({model,messages,max_tokens:maxTokens,temperature,stream:!!onToken})
-    });
+    if(proxyMode){
+      /* 邀请码通道：仅向 Supabase 中转发送消息，授权由服务端完成 */
+      resp=await fetch(EDGE_URL,{
+        method:'POST',
+        headers:{'Content-Type':'application/json','x-invite-code':INVITE_CODE},
+        body:JSON.stringify({messages,max_tokens:maxTokens,temperature})
+      });
+    }else{
+      const base=$('baseUrl').value.trim().replace(/\/+$/,'');
+      const key=$('apiKey').value.trim();
+      const model=$('model').value.trim();
+      resp=await fetch(base+'/chat/completions',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
+        body:JSON.stringify({model,messages,max_tokens:maxTokens,temperature,stream:!!onToken})
+      });
+    }
   }catch(netErr){
     throw new Error('网络请求失败：'+(netErr.message||netErr)+
       '\n提示：若是手机直接打开 html 文件，部分平台会因跨域限制拦截请求，建议把网页部署到 http(s) 环境访问（本项目推荐直接用部署后的网址）');
@@ -693,8 +836,8 @@ let lastResult=null;
 $('startBtn').addEventListener('click',async()=>{
   const male=$('maleName').value.trim()||'男生';
   const female=$('femaleName').value.trim()||'女生';
-  if(!$('baseUrl').value.trim()||!$('apiKey').value.trim()||!$('model').value.trim())
-    return toast('请先完整填写 Base URL、API Key 和模型名称');
+  if(!proxyMode && (!$('baseUrl').value.trim()||!$('apiKey').value.trim()||!$('model').value.trim()))
+    return toast('请先输入邀请码激活，或完整填写 Base URL、API Key 和模型名称');
   if(images.length===0)return toast('请先上传至少一张聊天记录截图');
 
   $('startBtn').disabled=true;

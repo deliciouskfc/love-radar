@@ -1,0 +1,5 @@
+# Supabase CLI 部署配置（Dashboard 部署无需此文件）
+project_id = "ralskeiwruwvdpyioebt"
+
+[functions.chat]
+verify_jwt = false
