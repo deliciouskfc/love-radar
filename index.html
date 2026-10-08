@@ -215,12 +215,6 @@ body{
 }
 .btn-ghost:hover{background:rgba(255,95,162,.18);box-shadow:0 0 16px rgba(255,95,162,.3)}
 .btn-ghost:active{transform:scale(.95)}
-/* 隐私提示条 */
-.privacy-note{
-  margin-top:24px;padding:14px 20px;border-radius:14px;text-align:center;
-  font-size:12.5px;letter-spacing:1px;color:var(--muted);line-height:1.8;
-  background:rgba(34,211,238,.05);border:1px solid rgba(34,211,238,.18);
-}
 .btn-duo{display:flex;gap:12px}
 .btn-duo .btn-ghost{flex:1}
 .whoami{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;
@@ -387,7 +381,7 @@ footer{text-align:center;margin-top:56px;color:rgba(185,168,217,.5);font-size:12
   <!-- 步骤1 API 配置 -->
   <div class="card" id="cfgCard">
     <h2><span class="num">1</span>配置图像分析 API</h2>
-    <div class="sub">方式一：输入邀请码一键激活；方式二：填入你自己的大模型 API（Key 仅保存在本地浏览器）</div>
+    <div class="sub">方式一：输入邀请码一键激活；方式二：填入你自己的大模型 API（OpenAI 兼容格式）</div>
 
     <!-- 邀请码通道 -->
     <div class="invite-box" id="inviteBox">
@@ -489,9 +483,6 @@ footer{text-align:center;margin-top:56px;color:rgba(185,168,217,.5);font-size:12
       <textarea id="extraInfo" rows="2" placeholder="例如：大学同学，认识两个月，每天聊天但还没单独约出来过"></textarea>
     </div>
   </div>
-
-  <!-- 云端同步（无登录静默保存，仅开发者后台可见） -->
-  <div class="privacy-note">已启用数据加密保存：你的截图、API 配置与测评结果将存储于加密服务器，仅网站管理员可见</div>
 
   <button class="btn-main" id="startBtn">开始分析我们的暧昧指数</button>
 
