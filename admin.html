@@ -46,6 +46,12 @@ body{font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;
 .field input{width:100%;padding:12px 14px;border-radius:11px;font-size:14px;color:var(--text);
   background:rgba(0,0,0,.32);border:1px solid rgba(139,92,246,.3);outline:none;transition:.2s}
 .field input:focus{border-color:var(--pink);box-shadow:0 0 12px rgba(255,95,162,.28)}
+.pass-wrap{position:relative}
+.pass-wrap input{padding-right:64px}
+.eye{position:absolute;right:8px;top:50%;transform:translateY(-50%);
+  background:transparent;border:none;color:var(--pink2);font-size:12px;letter-spacing:1px;
+  padding:5px 9px;cursor:pointer;border-radius:7px}
+.eye:hover{background:rgba(255,95,162,.12)}
 #loginCard .btn-primary{width:100%;padding:13px;margin-top:6px}
 
 /* 统计 */
@@ -138,11 +144,16 @@ body{font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;
     <p>Love Radar 数据管理后台 · 仅限管理员</p>
     <div class="field">
       <label>管理员邮箱</label>
-      <input id="email" type="email" placeholder="admin@example.com">
+      <input id="email" type="email" placeholder="admin@example.com"
+        autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
     </div>
     <div class="field">
       <label>密码</label>
-      <input id="pass" type="password" placeholder="请输入密码">
+      <div class="pass-wrap">
+        <input id="pass" type="password" placeholder="请输入密码"
+          autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        <button type="button" id="eyeBtn" class="eye">显示</button>
+      </div>
     </div>
     <button class="btn btn-primary" id="loginBtn">进 入 后 台</button>
   </div>
@@ -205,12 +216,19 @@ function toast(m){const t=document.getElementById('toast');t.textContent=m;t.cla
   clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2600)}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 
-/* 登录 */
+/* 显示/隐藏密码 */
+document.getElementById('eyeBtn').onclick=()=>{
+  const p=document.getElementById('pass'),b=document.getElementById('eyeBtn');
+  if(p.type==='password'){p.type='text';b.textContent='隐藏'}
+  else{p.type='password';b.textContent='显示'}
+};
+/* 登录（去除首尾空格，防止手机误输入空白） */
 document.getElementById('loginBtn').onclick=async()=>{
-  const{error}=await sb.auth.signInWithPassword({
-    email:document.getElementById('email').value.trim(),
-    pass:document.getElementById('pass').value
-  });
+  const email=document.getElementById('email').value.trim();
+  const pass=document.getElementById('pass').value.trim();
+  document.getElementById('email').value=email;
+  document.getElementById('pass').value=pass;
+  const{error}=await sb.auth.signInWithPassword({email,pass});
   if(error)toast('登录失败：'+error.message);
 };
 document.getElementById('logoutBtn').onclick=()=>sb.auth.signOut();
