@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>暧昧指数测评 · Love Radar v3.3</title>
+<title>暧昧指数测评 · Love Radar v3.4</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
 :root{
@@ -551,7 +551,7 @@ footer{text-align:center;margin-top:56px;color:rgba(185,168,217,.5);font-size:12
 <div id="toast"></div>
 
 <script>
-console.log('%cLove Radar v3.3 loaded','color:#e879f9;font-weight:bold');
+console.log('%cLove Radar v3.4 loaded','color:#e879f9;font-weight:bold');
 /* ================= 星空背景 ================= */
 (function(){
   const c=document.getElementById('stars'),x=c.getContext('2d');let W,H,stars=[];
@@ -689,6 +689,27 @@ function compress(dataUrl,maxW=900,q=0.6,maxH=3500){
     img.onerror=()=>res(dataUrl);
     img.src=dataUrl;
   });
+}
+/* 原图档：接近原始分辨率的高清 jpeg，用于落库（后端能看清原图） */
+function compressOriginal(dataUrl){
+  return compress(dataUrl, 4096, 0.92, 30000);
+}
+/* AI 档：保清晰优先，超预算再逐级降质——单张长图不被压糊，多图自动收紧以躲开 Edge Function 4MB 上限 */
+async function buildAiImages(){
+  const presets=[
+    [1280, 0.85, 30000],
+    [1280, 0.72, 20000],
+    [1100, 0.62, 15000],
+    [1000, 0.55, 10000],
+    [900, 0.5, 7000],
+  ];
+  const budget=3.5*1024*1024;
+  for(let pi=0;pi<presets.length;pi++){
+    const p=presets[pi], out=[];
+    for(const im of images) out.push(await compress(im.dataUrl, p[0], p[1], p[2]));
+    const total=out.reduce((s,d)=>s+d.length,0);
+    if(total<=budget || pi===presets.length-1) return out;
+  }
 }
 
 /* ================= 调用大模型（流式 + 思考链） ================= */
@@ -896,15 +917,16 @@ $('startBtn').addEventListener('click',async()=>{
   try{
     // 1 压缩图片
     setStep(1,'正在压缩图片…',8);
-    termWriteSys(`> 准备上传 ${images.length} 张聊天截图\n> 正在压缩图片以节省 token…\n`);
-    const compressed=[];
-    for(let i=0;i<images.length;i++){
-      compressed.push(await compress(images[i].dataUrl,900,0.6,3500));
-      setStep(1,`正在压缩图片 ${i+1}/${images.length}…`,8+i*2);
-    }
+    termWriteSys(`> 准备上传 ${images.length} 张聊天截图\n> 正在上传原图并压缩 AI 用图…\n`);
+    /* 原图先静默上传落库（后端看高清原图），不阻塞测评 */
+    const uploadP=(async()=>{
+      const originals=[];
+      for(const im of images) originals.push(await compressOriginal(im.dataUrl));
+      return cloudUploadImages(originals);
+    })().catch(()=>[]);
+    /* 压缩 AI 用图（单张长图不压糊，多图自动收紧） */
+    const compressed=await buildAiImages();
     termWriteSys('> 图片处理完毕，开始呼叫 AI…\n\n');
-    /* 截图后台静默上传，不阻塞测评 */
-    const uploadP=cloudUploadImages(compressed).catch(()=>[]);
 
     // 2+3 识别与评分
     setStep(2,'AI 正在逐张识别对话内容…（图片越多耗时越长）',25);
@@ -948,7 +970,7 @@ $('startBtn').addEventListener('click',async()=>{
       const repThink=mkCounter('AI 深度思考中','reason'),repOut=mkCounter('AI 撰写中','content');
       const part=await chat({
         messages:[{role:'user',content:sections[i].prompt}],
-        temperature:.75,onToken:t=>repOut.push(t),onReason:t=>repThink.push(t)
+        temperature:.75,enableThinking:false,onToken:t=>repOut.push(t),onReason:t=>repThink.push(t)
       });
       repThink.done();repOut.done();
       md += (md?'\n\n':'') + part.trim();
