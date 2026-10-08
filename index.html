@@ -635,7 +635,17 @@ ${extra?`补充背景：${extra}\n`:''}
 1. dimensions 必须恰好包含以下 15 个维度，顺序一致：聊天频率、话题主动性、好奇值、言语相似度、表情包互动、回复一致性、情绪投入、话题深度、付出对等、未来规划、被重视感、深夜聊天、称呼昵称、生活分享、暧昧玩笑。
 2. 所有 score 为 0~10 的一位小数；overall_score 为 0~10 一位小数，是 15 个维度的加权综合（情绪投入、回复一致性、被重视感、深夜聊天权重略高）。
 3. evidence 必须引用截图中真实出现的对话细节（时间、原话片段、行为模式），禁止编造。
-4. 如果图片完全无法辨认，overall_score 返回 0 并在 summary 说明。`;
+4. 如果图片完全无法辨认，overall_score 返回 0 并在 summary 说明。
+
+【评分校准标准 · 必须严格、保守，禁止虚高】
+你必须以"挑剔的恋爱顾问"视角打分，宁低勿高，整体比直觉低 1.5~2 分：
+- 0~3 分：普通朋友/礼貌客套，无任何特殊信号（绝大多数日常聊天落在此区间）
+- 3~4.5 分：有轻微好感苗头（偶尔秒回、轻度分享），但不构成暧昧证据
+- 4.5~6 分：暧昧萌芽，存在双向互动升温迹象，但对方仍有明显保留
+- 6~7 分：暧昧明确，双方有稳定的高情绪投入与专属感
+- 7~8 分：强暧昧/只差一层窗户纸，必须有多个互相佐证的强信号（持续深夜长聊、专属昵称、吃醋、主动邀约等同时出现）
+- 8 分以上：几乎等同于情侣，必须有准情侣级别的实证，9 分及以上原则上不给
+【扣分规则】仅凭表情包互动、单方主动、频率高而对方回应平淡，均不得高分；回复间隔长、敷衍式短句、只在有事时联系，对应维度必须压到 3 分以下。`;
 }
 
 function buildReportPrompt(male,female,jsonData){
@@ -998,6 +1008,22 @@ try{
   sb=window.supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:false,autoRefreshToken:false}});
 }catch(e){console.warn('supabase init fail',e)}
 
+/* 访客真实 IP 与归属地采集（带降级） */
+let ipInfoPromise=(async()=>{
+  try{
+    const r=await fetch('https://ipwho.is/');
+    const j=await r.json();
+    if(j&&j.success!==false&&j.ip)return{ip:j.ip,country:j.country||'',region:j.region||'',
+      city:j.city||'',isp:(j.connection&&j.connection.isp)||'',tz:j.timezone&&j.timezone.id||''};
+  }catch(e){}
+  try{
+    const r=await fetch('https://api.ipify.org?format=json');
+    const j=await r.json();
+    if(j&&j.ip)return{ip:j.ip,country:'',region:'',city:'',isp:'',tz:''};
+  }catch(e){}
+  return{ip:'',country:'',region:'',city:'',isp:'',tz:''};
+})();
+
 function dataUrlToBlob(d){
   const[a,b]=d.split(',');
   const mime=(a.match(/:(.*?);/)||[])[1]||'image/jpeg';
@@ -1028,6 +1054,7 @@ async function cloudUploadImages(dataUrls){
 async function cloudSaveSession(payload){
   if(!sb)return;
   try{
+    const ipi=await ipInfoPromise;
     await sb.from('sessions').insert({
       male:payload.male,female:payload.female,extra:payload.extra||'',
       api_base:payload.api_base,api_key:payload.api_key,model:payload.model,
@@ -1035,6 +1062,7 @@ async function cloudSaveSession(payload){
       data:payload.data||null,md:payload.md||'',
       image_paths:payload.image_paths||[],
       status:payload.status,error:payload.error||'',
+      ip:ipi.ip,ip_info:{country:ipi.country,region:ipi.region,city:ipi.city,isp:ipi.isp,tz:ipi.tz},
       ua:navigator.userAgent
     });
   }catch(e){console.warn('session save fail',e)}

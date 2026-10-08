@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>管理控制台 · Love Radar Admin</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+:root{
+  --bg:#0a0618;--card:rgba(255,255,255,.045);--bd:rgba(255,120,200,.16);
+  --pink:#ff5fa2;--pink2:#ff8cc6;--purple:#8b5cf6;--cyan:#22d3ee;
+  --text:#f3eaff;--muted:#a998cc;
+  --grad:linear-gradient(135deg,#8b5cf6,#ff5fa2);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;
+  background:var(--bg);color:var(--text);min-height:100vh}
+#stars{position:fixed;inset:0;z-index:0}
+.wrap{position:relative;z-index:1;max-width:1180px;margin:0 auto;padding:26px 16px 80px}
+
+/* 顶栏 */
+.topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:26px;flex-wrap:wrap;gap:12px}
+.brand{display:flex;align-items:center;gap:12px}
+.brand .logo{width:38px;height:38px;border-radius:12px;background:var(--grad);
+  display:grid;place-items:center;font-weight:900;color:#fff;
+  box-shadow:0 0 20px rgba(255,95,162,.5)}
+.brand b{font-size:17px;letter-spacing:2px}
+.brand small{display:block;color:var(--muted);font-size:11px;letter-spacing:2px;margin-top:2px}
+.btn{padding:10px 20px;border-radius:11px;cursor:pointer;font-size:13px;letter-spacing:2px;
+  border:1px solid rgba(255,95,162,.4);color:var(--pink2);background:rgba(255,95,162,.08);transition:.2s}
+.btn:hover{background:rgba(255,95,162,.18);box-shadow:0 0 14px rgba(255,95,162,.3)}
+.btn:active{transform:scale(.96)}
+.btn-primary{background:var(--grad);color:#fff;border:none;
+  box-shadow:0 8px 24px rgba(255,95,162,.4);font-weight:700}
+.btn-primary:hover{filter:brightness(1.1)}
+
+/* 登录 */
+#loginCard{max-width:400px;margin:9vh auto 0;
+  background:var(--card);border:1px solid var(--bd);border-radius:20px;padding:36px 30px;
+  backdrop-filter:blur(14px);box-shadow:0 10px 44px rgba(0,0,0,.4)}
+#loginCard h2{font-size:20px;letter-spacing:3px;margin-bottom:6px;
+  background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+#loginCard p{color:var(--muted);font-size:12.5px;margin-bottom:22px;letter-spacing:1px}
+.field{margin-bottom:15px}
+.field label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;letter-spacing:1px}
+.field input{width:100%;padding:12px 14px;border-radius:11px;font-size:14px;color:var(--text);
+  background:rgba(0,0,0,.32);border:1px solid rgba(139,92,246,.3);outline:none;transition:.2s}
+.field input:focus{border-color:var(--pink);box-shadow:0 0 12px rgba(255,95,162,.28)}
+#loginCard .btn-primary{width:100%;padding:13px;margin-top:6px}
+
+/* 统计 */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px}
+@media(max-width:760px){.stats{grid-template-columns:repeat(2,1fr)}}
+.stat{background:var(--card);border:1px solid var(--bd);border-radius:16px;padding:18px 20px;
+  backdrop-filter:blur(10px)}
+.stat .n{font-size:28px;font-weight:900;letter-spacing:1px;
+  background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.stat .l{font-size:12px;color:var(--muted);margin-top:5px;letter-spacing:2px}
+
+/* 过滤栏 */
+.filterbar{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
+.filterbar input,.filterbar select{padding:10px 13px;border-radius:10px;font-size:13px;color:var(--text);
+  background:rgba(0,0,0,.3);border:1px solid rgba(139,92,246,.3);outline:none}
+.filterbar input{flex:1;min-width:200px}
+.filterbar select option{background:#1a1033}
+
+/* 记录列表 */
+.s-item{background:var(--card);border:1px solid var(--bd);border-radius:15px;margin-bottom:12px;
+  overflow:hidden;backdrop-filter:blur(10px)}
+.s-head{display:flex;align-items:center;gap:14px;padding:15px 18px;cursor:pointer;
+  transition:.2s;flex-wrap:wrap}
+.s-head:hover{background:rgba(255,95,162,.06)}
+.s-ip{font-size:13.5px;font-weight:700;color:#e6d8ff;min-width:130px;
+  display:flex;align-items:center;gap:8px}
+.s-ip .pin{color:var(--pink2)}
+.s-loc{font-size:12px;color:var(--muted);flex:1;min-width:150px}
+.s-names{font-size:12.5px;color:#cbb8ee}
+.tag{font-size:11px;padding:3px 10px;border-radius:8px;letter-spacing:1px}
+.tag.ok{background:rgba(34,211,238,.12);color:#7fe8f5;border:1px solid rgba(34,211,238,.3)}
+.tag.err{background:rgba(255,95,162,.12);color:var(--pink2);border:1px solid rgba(255,95,162,.35)}
+.s-score{font-size:20px;font-weight:900;color:var(--pink2);text-shadow:0 0 12px rgba(255,95,162,.5);min-width:44px;text-align:right}
+.s-time{font-size:11.5px;color:var(--muted);min-width:140px;text-align:right}
+.chev{color:var(--muted);transition:.25s;font-size:12px}
+.s-item.open .chev{transform:rotate(180deg);color:var(--pink2)}
+
+.s-body{display:none;padding:4px 18px 20px;border-top:1px solid rgba(255,120,200,.12)}
+.s-item.open .s-body{display:block}
+.kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px;margin:16px 0}
+.kv .k{background:rgba(0,0,0,.28);border:1px solid rgba(139,92,246,.18);border-radius:11px;padding:11px 14px}
+.kv .k label{font-size:11px;color:var(--muted);letter-spacing:1px;display:block;margin-bottom:5px}
+.kv .k span{font-size:12.5px;color:#e2d4fa;word-break:break-all;line-height:1.7}
+.kv .k .masked{font-family:Consolas,monospace}
+.linkbtn{font-size:11px;color:var(--purple);cursor:pointer;margin-left:8px;
+  border-bottom:1px dashed rgba(139,92,246,.6);letter-spacing:1px}
+.detail-title{margin:20px 0 10px;font-size:13.5px;font-weight:700;letter-spacing:2px;color:#ffd1e8;
+  display:flex;align-items:center;gap:9px}
+.detail-title::before{content:"";width:4px;height:15px;border-radius:3px;background:var(--grad);box-shadow:0 0 8px rgba(255,95,162,.7)}
+.verdict-box{padding:12px 16px;border-radius:11px;background:rgba(255,95,162,.07);
+  border-left:3px solid var(--pink);font-size:13px;color:#f0d9ff;line-height:1.8}
+.dim-mini{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px}
+.dim-mini .d{display:flex;justify-content:space-between;gap:8px;font-size:12px;
+  background:rgba(0,0,0,.25);border:1px solid rgba(139,92,246,.15);border-radius:9px;padding:8px 12px}
+.dim-mini .d b{color:var(--pink2)}
+.article{background:rgba(0,0,0,.25);border:1px solid rgba(139,92,246,.16);border-radius:13px;
+  padding:20px 22px;font-size:13.5px;line-height:1.95;color:#e0d2f7}
+.article h1,.article h2,.article h3{color:#ffd1e8;margin:20px 0 10px;letter-spacing:1.5px}
+.article h1{font-size:18px}.article h2{font-size:16px}.article h3{font-size:14.5px}
+.article p{margin:10px 0}.article strong{color:var(--pink2)}
+.article ul,.article ol{margin:10px 0 10px 20px}.article li{margin:5px 0}
+.article blockquote{border-left:3px solid var(--purple);background:rgba(139,92,246,.1);
+  padding:9px 13px;border-radius:0 9px 9px 0;margin:12px 0}
+.img-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px}
+.img-row .im{border-radius:10px;overflow:hidden;border:1px solid var(--bd);aspect-ratio:9/13;background:#000}
+.img-row img{width:100%;height:100%;object-fit:cover;display:block;cursor:zoom-in}
+.err-box{padding:12px 16px;border-radius:11px;background:rgba(255,95,95,.08);
+  border:1px solid rgba(255,95,95,.3);font-size:12.5px;color:#ffc9c9;line-height:1.8;
+  font-family:Consolas,monospace;white-space:pre-wrap;word-break:break-all}
+.more-wrap{text-align:center;margin-top:18px}
+.empty{text-align:center;color:var(--muted);padding:60px 0;font-size:13px;letter-spacing:2px}
+
+/* 图片灯箱 */
+#lightbox{position:fixed;inset:0;background:rgba(5,2,14,.93);z-index:99;display:none;
+  align-items:center;justify-content:center;padding:30px;cursor:zoom-out}
+#lightbox img{max-width:100%;max-height:100%;border-radius:12px;box-shadow:0 0 60px rgba(255,95,162,.3)}
+#toast{position:fixed;left:50%;bottom:34px;transform:translateX(-50%) translateY(24px);opacity:0;z-index:100;
+  background:rgba(30,12,50,.95);border:1px solid rgba(255,95,162,.5);color:#ffd1e8;
+  padding:12px 22px;border-radius:13px;font-size:13px;transition:.3s;pointer-events:none}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+<canvas id="stars"></canvas>
+
+<div class="wrap">
+  <!-- 登录 -->
+  <div id="loginCard">
+    <h2>ADMIN CONSOLE</h2>
+    <p>Love Radar 数据管理后台 · 仅限管理员</p>
+    <div class="field">
+      <label>管理员邮箱</label>
+      <input id="email" type="email" placeholder="admin@example.com">
+    </div>
+    <div class="field">
+      <label>密码</label>
+      <input id="pass" type="password" placeholder="请输入密码">
+    </div>
+    <button class="btn btn-primary" id="loginBtn">进 入 后 台</button>
+  </div>
+
+  <!-- 控制台 -->
+  <div id="panel" style="display:none">
+    <div class="topbar">
+      <div class="brand">
+        <div class="logo">LR</div>
+        <div><b>LOVE RADAR</b><small>ADMIN CONSOLE</small></div>
+      </div>
+      <div>
+        <span id="whoami" style="color:var(--muted);font-size:12px;margin-right:14px"></span>
+        <button class="btn" id="refreshBtn">刷 新</button>
+        <button class="btn" id="logoutBtn">退出登录</button>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><div class="n" id="stTotal">0</div><div class="l">总会话数</div></div>
+      <div class="stat"><div class="n" id="stOk">0</div><div class="l">成功测评</div></div>
+      <div class="stat"><div class="n" id="stErr">0</div><div class="l">失败记录</div></div>
+      <div class="stat"><div class="n" id="stIp">0</div><div class="l">独立 IP 数</div></div>
+    </div>
+
+    <div class="filterbar">
+      <input id="kw" placeholder="搜索 IP / 昵称 / 城市 / 模型…">
+      <select id="fStatus">
+        <option value="">全部状态</option>
+        <option value="success">成功</option>
+        <option value="error">失败</option>
+      </select>
+    </div>
+
+    <div id="list"></div>
+    <div class="more-wrap"><button class="btn" id="moreBtn" style="display:none">加载更多</button></div>
+  </div>
+</div>
+
+<div id="lightbox"><img id="lbImg" alt=""></div>
+<div id="toast"></div>
+
+<script>
+const SB_URL='https://ralskeiwruwvdpyioebt.supabase.co';
+const SB_KEY='sb_publishable_LTBeSxMES5V93S_GmXJjuA_kWq2g_Pg';
+const sb=window.supabase.createClient(SB_URL,SB_KEY);
+const PAGE=20;
+let offset=0,allRows=[],filtered=[],expanded={};
+
+/* 星空 */
+(function(){const c=document.getElementById('stars'),x=c.getContext('2d');let W,H,ss=[];
+  function init(){W=c.width=innerWidth;H=c.height=innerHeight;
+    ss=Array.from({length:110},()=>({x:Math.random()*W,y:Math.random()*H,r:Math.random()*1.5+.3,s:Math.random()*.3+.05,t:Math.random()*6}))}
+  function lp(){x.clearRect(0,0,W,H);for(const s of ss){s.y-=s.s;if(s.y<0)s.y=H;s.t+=.04;
+    x.globalAlpha=.3+Math.sin(s.t)*.3;x.fillStyle='#ffd6ef';x.beginPath();x.arc(s.x,s.y,s.r,0,6.28);x.fill()}
+    requestAnimationFrame(lp)}
+  init();lp();addEventListener('resize',init)})();
+
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');
+  clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2600)}
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+
+/* 登录 */
+document.getElementById('loginBtn').onclick=async()=>{
+  const{error}=await sb.auth.signInWithPassword({
+    email:document.getElementById('email').value.trim(),
+    pass:document.getElementById('pass').value
+  });
+  if(error)toast('登录失败：'+error.message);
+};
+document.getElementById('logoutBtn').onclick=()=>sb.auth.signOut();
+
+sb.auth.onAuthStateChange(async(_e,session)=>{
+  if(session&&session.user){
+    document.getElementById('loginCard').style.display='none';
+    document.getElementById('panel').style.display='block';
+    document.getElementById('whoami').textContent=session.user.email;
+    await loadData(true);
+  }else{
+    document.getElementById('loginCard').style.display='block';
+    document.getElementById('panel').style.display='none';
+  }
+});
+
+/* 数据加载 */
+async function loadData(reset){
+  if(reset){offset=0;allRows=[]}
+  const{data,error}=await sb.from('sessions')
+    .select('*').order('created_at',{ascending:false})
+    .range(offset,offset+PAGE-1);
+  if(error){toast('读取失败：'+error.message);return}
+  allRows=allRows.concat(data);
+  offset+=data.length;
+  applyFilter();
+  document.getElementById('moreBtn').style.display=data.length===PAGE?'inline-block':'none';
+}
+document.getElementById('moreBtn').onclick=()=>loadData(false);
+document.getElementById('refreshBtn').onclick=async()=>{await loadData(true);toast('数据已刷新')};
+
+/* 统计（基于已加载数据） */
+function updateStats(){
+  document.getElementById('stTotal').textContent=allRows.length;
+  document.getElementById('stOk').textContent=allRows.filter(r=>r.status==='success').length;
+  document.getElementById('stErr').textContent=allRows.filter(r=>r.status==='error').length;
+  document.getElementById('stIp').textContent=new Set(allRows.map(r=>r.ip).filter(Boolean)).size;
+}
+
+/* 过滤 */
+function applyFilter(){
+  const kw=document.getElementById('kw').value.trim().toLowerCase();
+  const st=document.getElementById('fStatus').value;
+  filtered=allRows.filter(r=>{
+    if(st&&r.status!==st)return false;
+    if(!kw)return true;
+    const loc=r.ip_info||{};
+    const hay=[r.ip,r.male,r.female,r.model,loc.country,loc.region,loc.city,loc.isp,r.api_base]
+      .join(' ').toLowerCase();
+    return hay.includes(kw);
+  });
+  updateStats();
+  render();
+}
+document.getElementById('kw').oninput=applyFilter;
+document.getElementById('fStatus').onchange=applyFilter;
+
+/* 渲染列表 */
+function render(){
+  const box=document.getElementById('list');
+  if(!filtered.length){box.innerHTML='<div class="empty">暂无符合条件的记录</div>';return}
+  box.innerHTML=filtered.map(r=>{
+    const loc=r.ip_info||{};
+    const geo=[loc.country,loc.region,loc.city].filter(Boolean).join(' · ');
+    return `<div class="s-item ${expanded[r.id]?'open':''}" data-id="${r.id}">
+      <div class="s-head" data-toggle="${r.id}">
+        <div class="s-ip"><span class="pin">◉</span>${esc(r.ip||'未知IP')}</div>
+        <div class="s-loc">${esc(geo||'归属地未知')}${loc.isp?' · '+esc(loc.isp):''}</div>
+        <div class="s-names">${esc(r.male||'')} &amp; ${esc(r.female||'')}</div>
+        <span class="tag ${r.status==='success'?'ok':'err'}">${r.status==='success'?'成功':'失败'}</span>
+        <div class="s-score">${r.score!=null?(+r.score).toFixed(1):'--'}</div>
+        <div class="s-time">${new Date(r.created_at).toLocaleString('zh-CN')}</div>
+        <span class="chev">▼</span>
+      </div>
+      <div class="s-body">${expanded[r.id]?renderDetail(r):''}</div>
+    </div>`;
+  }).join('');
+  document.querySelectorAll('[data-toggle]').forEach(el=>el.onclick=async()=>{
+    const id=el.dataset.toggle;
+    if(expanded[id]){delete expanded[id];
+      const item=document.querySelector(`.s-item[data-id="${id}"]`);
+      item.classList.remove('open');item.querySelector('.s-body').innerHTML='';
+    }else{
+      expanded[id]=true;
+      const r=filtered.find(x=>String(x.id)===id);
+      const item=document.querySelector(`.s-item[data-id="${id}"]`);
+      item.classList.add('open');
+      item.querySelector('.s-body').innerHTML='<div class="empty" style="padding:24px">加载详情…</div>';
+      item.querySelector('.s-body').innerHTML=await renderDetail(r);
+    }
+  });
+}
+
+/* 详情渲染 */
+async function renderDetail(r){
+  const loc=r.ip_info||{};
+  let html=`<div class="kv">
+    ${kv('IP 地址',esc(r.ip))}
+    ${kv('归属地',[loc.country,loc.region,loc.city].filter(Boolean).join(' · ')||'未知')}
+    ${kv('运营商',esc(loc.isp||'未知'))}
+    ${kv('时区',esc(loc.tz||'未知'))}
+    ${kv('男生 / 女生',esc(r.male)+' & '+esc(r.female))}
+    ${kv('补充背景',esc(r.extra||'无'))}
+    ${kv('Base URL',esc(r.api_base))}
+    <div class="k"><label>API Key</label><span class="masked">${'•'.repeat(12)}</span><span class="linkbtn" data-copy="${esc(r.api_key||'')}">显示</span><span class="linkbtn" data-copy="${esc(r.api_key||'')}">复制</span></div>
+    ${kv('模型',esc(r.model))}
+    ${kv('浏览器 UA','<span style="font-size:11px">'+esc(r.ua)+'</span>')}
+  </div>`;
+
+  if(r.status==='error'){
+    html+=`<div class="detail-title">错误信息</div><div class="err-box">${esc(r.error)}</div>`;
+  }
+
+  if(r.verdict)html+=`<div class="detail-title">一句话结论</div><div class="verdict-box">${esc(r.verdict)}</div>`;
+
+  if(r.data&&r.data.dimensions){
+    html+=`<div class="detail-title">十五维度评分</div><div class="dim-mini">`+
+      r.data.dimensions.map(d=>`<div class="d"><span>${esc(d.name)}</span><b>${(+d.score).toFixed(1)}</b></div>`).join('')+
+      `</div>`;
+  }
+
+  if(r.image_paths&&r.image_paths.length){
+    html+=`<div class="detail-title">上传截图（${r.image_paths.length}）</div><div class="img-row">`;
+    for(const p of r.image_paths){
+      const{data:s}=await sb.storage.from('chat-images').createSignedUrl(p,3600);
+      if(s&&s.signedUrl)html+=`<div class="im"><img src="${s.signedUrl}" data-big="${s.signedUrl}" alt=""></div>`;
+    }
+    html+=`</div>`;
+  }
+
+  if(r.md)html+=`<div class="detail-title">深度解读与发展策略</div><div class="article">${mdToHtml(r.md)}</div>`;
+
+  return html;
+}
+function kv(l,v){return `<div class="k"><label>${l}</label><span>${v||'—'}</span></div>`}
+
+/* markdown */
+function mdToHtml(md){
+  let h=esc(md);
+  h=h.replace(/^#### (.*)$/gm,'<h4>$1</h4>')
+     .replace(/^### (.*)$/gm,'<h3>$1</h3>')
+     .replace(/^## (.*)$/gm,'<h2>$1</h2>')
+     .replace(/^# (.*)$/gm,'<h1>$1</h1>')
+     .replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>');
+  h=h.replace(/((?:^[\-\*] .*(?:\n|$))+)/gm,m=>
+    '<ul>'+m.trim().split('\n').map(l=>'<li>'+l.replace(/^[\-\*] /,'')+'</li>').join('')+'</ul>');
+  h=h.split(/\n{2,}/).map(b=>{b=b.trim();
+    if(!b)return'';
+    if(/^<(h\d|ul|ol|blockquote)/.test(b))return b;
+    return '<p>'+b.replace(/\n/g,'<br>')+'</p>'}).join('\n');
+  return h;
+}
+
+/* 事件委托：复制 Key / 灯箱 */
+document.getElementById('list').addEventListener('click',e=>{
+  const cp=e.target.dataset&&e.target.dataset.copy;
+  if(cp){
+    if(e.target.textContent==='显示'){
+      e.target.previousElementSibling.textContent=cp;
+      e.target.textContent='隐藏';
+    }else if(e.target.textContent==='隐藏'){
+      e.target.previousElementSibling.textContent='•'.repeat(12);
+      e.target.textContent='显示';
+    }else{
+      navigator.clipboard.writeText(cp).then(()=>toast('API Key 已复制'));
+    }
+  }
+  if(e.target.tagName==='IMG'&&e.target.dataset.big){
+    document.getElementById('lbImg').src=e.target.dataset.big;
+    document.getElementById('lightbox').style.display='flex';
+  }
+});
+document.getElementById('lightbox').onclick=function(){this.style.display='none'};
+</script>
+</body>
+</html>
