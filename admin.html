@@ -381,6 +381,7 @@ async function renderDetail(r){
   if(r.md)html+=`<div class="detail-title">深度解读与发展策略</div><div class="article">${mdToHtml(r.md)}</div>`;
 
   html+=`<div class="s-del-row">
+    <button class="btn btn-primary" data-export="${r.id}">导出 HTML 报告</button>
     <button class="btn-del" data-del="${r.id}">删除此记录</button>
   </div>`;
   return html;
@@ -404,9 +405,14 @@ function mdToHtml(md){
   return h;
 }
 
-/* 事件委托：复制 Key / 灯箱 */
+/* 事件委托：复制 Key / 灯箱 / 导出 HTML */
 document.getElementById('list').addEventListener('click',e=>{
   const cp=e.target.dataset&&e.target.dataset.copy;
+  if(e.target.dataset&&e.target.dataset.export){
+    const r=allRows.find(x=>String(x.id)===String(e.target.dataset.export));
+    if(r)exportHtml(r);
+    return;
+  }
   if(cp){
     if(e.target.textContent==='显示'){
       e.target.previousElementSibling.textContent=cp;
@@ -424,6 +430,81 @@ document.getElementById('list').addEventListener('click',e=>{
   }
 });
 document.getElementById('lightbox').onclick=function(){this.style.display='none'};
+
+/* ================= 导出单条为 HTML ================= */
+function exportHtml(r){
+  const data=r.data||{};
+  const dims=data.dimensions||[];
+  const male=esc(r.male||'男生'), female=esc(r.female||'女生');
+  const score=Math.min(10,Math.max(0,+r.score||0)).toFixed(1);
+  const CN=['①','②','③','④','⑤','⑥','⑦','⑧','⑨','⑩','⑪','⑫','⑬','⑭','⑮'];
+
+  /* 雷达图 SVG */
+  const R=240,C=300,N=dims.length||1;
+  const pt=(i,rr)=>{const a=-Math.PI/2+i*2*Math.PI/N;return[C+Math.cos(a)*rr,C+Math.sin(a)*rr]};
+  let grid='',axes='',labels='';
+  for(let ring=1;ring<=5;ring++){
+    grid+='<polygon points="'+dims.map((_,i)=>pt(i,R*ring/5).join(',')).join(' ')+'" fill="none" stroke="rgba(192,132,252,'+(ring===5?'.35':'.14')+')"/>';
+  }
+  dims.forEach((d,i)=>{
+    axes+='<line x1="'+C+'" y1="'+C+'" x2="'+pt(i,R)[0]+'" y2="'+pt(i,R)[1]+'" stroke="rgba(192,132,252,.14)"/>';
+    const a=-Math.PI/2+i*2*Math.PI/N,[x,y]=pt(i,R+36);
+    const anchor=Math.abs(Math.cos(a))<.3?'middle':(Math.cos(a)>0?'start':'end');
+    labels+='<text x="'+x+'" y="'+y+'" fill="#e9d5ff" font-size="12" font-weight="600" text-anchor="'+anchor+'" dominant-baseline="middle">'+esc(d.name)+'</text>';
+  });
+  const poly=dims.map((d,i)=>pt(i,R*Math.min(10,Math.max(0,+d.score))/10).join(',')).join(' ');
+  const dots=dims.map((d,i)=>{const[x,y]=pt(i,R*Math.min(10,Math.max(0,+d.score))/10);return '<circle cx="'+x+'" cy="'+y+'" r="4" fill="#ffd1e8"/>'}).join('');
+  const svg='<svg viewBox="0 0 600 600" width="480" xmlns="http://www.w3.org/2000/svg"><defs><radialGradient id="rg"><stop offset="0%" stop-color="rgba(139,92,246,.75)"/><stop offset="100%" stop-color="rgba(255,95,162,.4)"/></radialGradient></defs>'+
+    grid+axes+'<polygon points="'+poly+'" fill="url(#rg)" stroke="#ff8cc6" stroke-width="2"/>'+dots+labels+'</svg>';
+
+  const dimBars=dims.map((d,i)=>`
+    <div class="dim-card">
+      <div class="dim-top"><div class="dim-name"><span class="circle">${CN[i]||'·'}</span>${esc(d.name)}</div>
+      <div class="dim-score">${(+d.score).toFixed(1)}</div></div>
+      <div class="dim-bar"><i style="width:${Math.min(100,(+d.score)*10)}%"></i></div>
+      <div class="dim-desc">${esc(d.desc||'')}</div>
+      ${d.evidence?`<div class="dim-evi"><b>证据：</b>${esc(d.evidence)}</div>`:''}
+    </div>`).join('');
+
+  const html='<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">'+
+  '<title>'+male+' & '+female+' · 暧昧指数评价报告</title>'+
+  '<style>body{font-family:"Microsoft YaHei","PingFang SC",sans-serif;background:#0d0721;color:#f3eaff;margin:0;padding:34px 16px 70px}'+
+  '.wrap{max-width:860px;margin:0 auto}.names{text-align:center;font-size:26px;font-weight:900;color:#ff8cc6;letter-spacing:2px}'+
+  '.r-sub{text-align:center;color:#b9a8d9;font-size:13px;margin-top:8px;letter-spacing:2px}'+
+  '.score-big{text-align:center;font-size:64px;font-weight:900;color:#ff8cc6;text-shadow:0 0 22px rgba(255,95,162,.55);margin:22px 0 4px}'+
+  '.lbl{text-align:center;color:#b9a8d9;font-size:13px;letter-spacing:3px}.verdict{text-align:center;margin-top:14px;color:#ffd1e8;line-height:1.8}'+
+  '.section-title{display:flex;align-items:center;gap:12px;margin:38px 0 18px;font-size:21px;font-weight:800;letter-spacing:3px;color:#ffd1e8}'+
+  '.section-title::before{content:"";width:5px;height:24px;border-radius:4px;background:linear-gradient(135deg,#8b5cf6,#ff5fa2)}'+
+  '.radar-box{background:rgba(0,0,0,.3);border:1px solid rgba(255,120,200,.18);border-radius:20px;padding:16px;text-align:center}'+
+  '.dim-card{background:rgba(255,255,255,.05);border:1px solid rgba(255,120,200,.18);border-radius:16px;padding:18px;margin-bottom:14px}'+
+  '.dim-top{display:flex;justify-content:space-between;align-items:center}.dim-name{font-size:16px;font-weight:700}.circle{color:#ff8cc6;margin-right:6px}'+
+  '.dim-score{font-size:22px;font-weight:900;color:#ff8cc6}.dim-bar{height:8px;border-radius:99px;background:rgba(255,255,255,.08);margin:12px 0 10px;overflow:hidden}'+
+  '.dim-bar i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#8b5cf6,#ff5fa2)}'+
+  '.dim-desc{font-size:13.5px;color:#b9a8d9;line-height:1.8}.dim-evi{margin-top:10px;padding:11px 14px;border-left:3px solid #ff5fa2;border-radius:0 10px 10px 0;background:rgba(255,95,162,.07);font-size:13px;color:#f0d9ff;line-height:1.8}'+
+  '.dim-evi b{color:#ff8cc6}.article{background:rgba(255,255,255,.05);border:1px solid rgba(255,120,200,.18);border-radius:20px;padding:26px 24px;font-size:14.5px;line-height:2;color:#e8dcff}'+
+  '.article h1,.article h2,.article h3{color:#ffd1e8;margin:26px 0 12px;letter-spacing:2px}.article h1{font-size:20px}.article h2{font-size:18px}.article h3{font-size:16px}'+
+  '.article p{margin:12px 0}.article strong{color:#ff8cc6}.article ul,.article ol{margin:12px 0 12px 22px}.article li{margin:6px 0}'+
+  '.article blockquote{border-left:3px solid #8b5cf6;background:rgba(139,92,246,.1);padding:10px 14px;border-radius:0 10px 10px 0;margin:14px 0}'+
+  '.meta{background:rgba(0,0,0,.3);border:1px solid rgba(139,92,246,.2);border-radius:14px;padding:14px 18px;margin-top:16px;font-size:12.5px;color:#b9a8d9;line-height:1.9}'+
+  'footer{text-align:center;margin-top:50px;color:rgba(185,168,217,.5);font-size:12px;letter-spacing:2px}</style></head><body><div class="wrap">'+
+  '<div class="names">'+male+' & '+female+' · 暧昧指数评价报告</div>'+
+  '<div class="r-sub">AI 暧昧指数评价报告 · LOVE RADAR REPORT · '+new Date().toLocaleDateString('zh-CN')+'</div>'+
+  '<div class="score-big">'+score+'</div><div class="lbl">综合暧昧指数</div>'+
+  '<div class="verdict">'+esc(r.verdict||'')+'</div>'+
+  (dims.length?'<div class="section-title">一、维度雷达图</div><div class="radar-box">'+svg+'</div>':'')+
+  (dims.length?'<div class="section-title">二、十五维度评分明细</div>'+dimBars:'')+
+  '<div class="section-title">三、深度解读与发展策略</div><div class="article">'+
+  (data.summary?'<blockquote><strong>整体小结：</strong>'+esc(data.summary)+'</blockquote>':'')+mdToHtml(r.md||'')+'</div>'+
+  '<div class="meta">IP：'+esc(r.ip||'—')+' · 生成时间：'+(r.created_at?new Date(r.created_at).toLocaleString('zh-CN'):'—')+'</div>'+
+  '<footer>LOVE RADAR · 仅供娱乐 · 真心比数据更重要</footer></div></body></html>';
+
+  const blob=new Blob([html],{type:'text/html;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=male+'与'+female+'_暧昧指数报告.html';
+  a.click();URL.revokeObjectURL(a.href);
+  toast('报告已导出');
+}
 
 /* ================= 删除功能 ================= */
 async function deleteRecord(id){

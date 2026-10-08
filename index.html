@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>暧昧指数测评 · Love Radar v3.6</title>
+<title>暧昧指数测评 · Love Radar v3.7</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
 :root{
@@ -506,16 +506,25 @@ footer{text-align:center;margin-top:56px;color:rgba(185,168,217,.5);font-size:12
     </div>
 
     <div id="textMode" style="display:none">
-      <textarea class="chat-text-area" id="chatText" placeholder="直接粘贴微信聊天记录文本，格式不限，例如：
+      <textarea class="chat-text-area" id="chatText" placeholder="直接粘贴微信聊天记录文本，支持多种格式：
 
-小明 19:44
-可以
+【小程序/桌面版「多选→复制」格式】
+Fantasy. 14:40
+btw
+J 14:41
+有点想吃三文鱼了😋
 
-小红 19:45
-来得及的 mat加油
+【微信「合并转发聊天记录」格式】
+Fantasy: 有点想吃三文鱼了😋
+J: 要不顺便下个馆子
 
-也支持微信「多选 → 合并转发/复制」导出的格式。粘贴后点击下方按钮即可分析。"></textarea>
+格式不限，粘贴后点击下方按钮即可分析。"></textarea>
       <div class="text-count" id="textCount">已输入 <b>0</b> 字</div>
+      <div style="margin-top:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <button type="button" class="btn-mini" id="impTxtBtn">导入微信导出的 .txt</button>
+        <span class="hint" style="margin:0">也支持把微信导出的聊天记录 .txt / .docx 文本直接复制粘贴进来</span>
+      </div>
+      <input type="file" id="txtInput" accept=".txt,text/plain" style="display:none">
     </div>
 
     <div class="row2" style="margin-top:18px">
@@ -595,7 +604,7 @@ footer{text-align:center;margin-top:56px;color:rgba(185,168,217,.5);font-size:12
 <div id="toast"></div>
 
 <script>
-console.log('%cLove Radar v3.6 loaded','color:#e879f9;font-weight:bold');
+console.log('%cLove Radar v3.7 loaded','color:#e879f9;font-weight:bold');
 /* ================= 星空背景 ================= */
 (function(){
   const c=document.getElementById('stars'),x=c.getContext('2d');let W,H,stars=[];
@@ -696,6 +705,20 @@ document.querySelectorAll('#modeSwitch .mbtn').forEach(b=>b.addEventListener('cl
 /* 文本字数统计 */
 $('chatText').addEventListener('input',()=>{
   $('textCount').innerHTML='已输入 <b>'+$('chatText').value.length+'</b> 字';
+});
+/* 导入微信导出的 .txt 聊天记录 */
+$('impTxtBtn').addEventListener('click',()=>$('txtInput').click());
+$('txtInput').addEventListener('change',e=>{
+  const f=e.target.files&&e.target.files[0];
+  if(!f)return;
+  const rd=new FileReader();
+  rd.onload=()=>{
+    $('chatText').value=rd.result;
+    $('textCount').innerHTML='已输入 <b>'+$('chatText').value.length+'</b> 字';
+    toast('已导入 '+f.name);
+  };
+  rd.readAsText(f,'utf-8');
+  e.target.value='';
 });
 dz.addEventListener('click',()=>$('fileInput').click());
 $('pickBtn').addEventListener('click',e=>{e.stopPropagation();$('fileInput').click()});
@@ -891,7 +914,8 @@ function buildAnalysisPrompt(male,female,extra){
   return buildAnalysisPromptCore(male,female,extra,'这些微信/QQ聊天截图','截图');
 }
 function buildAnalysisPromptText(male,female,extra){
-  return buildAnalysisPromptCore(male,female,extra,'下方引用的微信/QQ聊天记录文本','聊天文本');
+  const base=buildAnalysisPromptCore(male,female,extra,'下方引用的微信/QQ聊天记录文本','聊天文本');
+  return base.replace('【输出要求】','【解析微信文本】文本可能来自微信「合并转发聊天记录」或「多选复制导出」，每行开头通常是「昵称 时间」或「昵称: 内容」。请据此识别每句话的发言者：'+male+' 是男生、'+female+' 是女生，逐条对应。\n\n【输出要求】');
 }
 function buildAnalysisPromptCore(male,female,extra,sourceDesc,evidenceWord){
   return `你是一位顶级的恋爱心理学与两性沟通分析专家。请仔细阅读${sourceDesc}（${male}为男生，${female}为女生），分析两人之间的暧昧程度。
