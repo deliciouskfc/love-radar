@@ -79,6 +79,8 @@ Deno.serve(async (req) => {
         model: FORCE_MODEL,
         messages,
         temperature: typeof payload.temperature === "number" ? payload.temperature : 0.7,
+        // 思考模型 reasoning 会占用输出预算，上限不足会导致 content 为空
+        max_tokens: 65536,
         stream: true,
       }),
     });

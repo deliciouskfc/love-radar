@@ -891,11 +891,12 @@ $('startBtn').addEventListener('click',async()=>{
     termWriteSys('\n\n> 评分数据接收完毕，正在解析…\n');
 
     let data=parseJSON(raw);
-    if(!data){ // 重试一次
-      termWriteSys('> 首次输出非合法JSON，正在要求 AI 重新输出…\n');
-      termWriteSys('> [调试] 原始输出前 300 字：'+JSON.stringify(raw.slice(0,300))+'\n\n');
+    if(!data||!Array.isArray(data.dimensions)||data.dimensions.length===0){
+      // 重试：必须携带原始完整上下文（截图+提示词），否则模型无从作答
+      termWriteSys('> 首次输出未包含有效评分 JSON，携带原始上下文重试…\n');
       console.log('[debug] raw:', raw);
-      raw=await chat({messages:[{role:'user',content:[{type:'text',text:'你刚才的输出不是合法JSON（包含了多余文字或未转义字符）。请严格只输出一个纯JSON对象，不要任何其他说明、不要markdown。'}]}],temperature:.2,onToken:termWriteContent,onReason:termWriteReason});
+      const retryParts=[{type:'text',text:content[0].text+'\n\n【再次强调】你上一次回复没有输出合法的评分JSON（可能只输出了思考过程）。请直接给出最终答案：严格只输出一个纯JSON对象，以 { 开头、以 } 结尾，包含 overall_score、overall_verdict、dimensions（15个维度）、summary 字段。禁止输出任何思考过程、解释文字或markdown代码块。'},...content.slice(1)];
+      raw=await chat({messages:[{role:'user',content:retryParts}],temperature:.2,onToken:termWriteContent,onReason:termWriteReason});
       data=parseJSON(raw);
     }
     if(!data||!Array.isArray(data.dimensions)||data.dimensions.length===0){
