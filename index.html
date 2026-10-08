@@ -452,7 +452,7 @@ footer{text-align:center;margin-top:56px;color:rgba(185,168,217,.5);font-size:12
   <!-- 步骤2 上传 -->
   <div class="card">
     <h2><span class="num">2</span>上传聊天记录截图</h2>
-    <div class="sub">支持多张长截图，按对话时间顺序上传效果更佳（最多 10 张）</div>
+    <div class="sub">支持多张长截图，按对话时间顺序上传效果更佳（最多 5 张）</div>
     <div class="dropzone" id="dropzone">
       <div class="dz-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="url(#dg1)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
@@ -653,7 +653,7 @@ document.addEventListener('paste',e=>{
 function addFiles(files){
   for(const f of files){
     if(!f.type.startsWith('image/'))continue;
-    if(images.length>=10){toast('最多上传 10 张截图');break}
+    if(images.length>=5){toast('最多上传 5 张截图');break}
     const rd=new FileReader();
     rd.onload=()=>{images.push({dataUrl:rd.result});renderThumbs()};
     rd.readAsDataURL(f);
@@ -666,7 +666,7 @@ function renderThumbs(){
   document.querySelectorAll('.thumb .del').forEach(b=>b.onclick=()=>{images.splice(+b.dataset.i,1);renderThumbs()});
 }
 /* 压缩图片，控制 token 消耗 */
-function compress(dataUrl,maxW=1400,q=.82){
+function compress(dataUrl,maxW=900,q=.62){
   return new Promise(res=>{
     const img=new Image();
     img.onload=()=>{
