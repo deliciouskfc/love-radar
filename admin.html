@@ -33,6 +33,13 @@ body{font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;
 .btn-primary{background:var(--grad);color:#fff;border:none;
   box-shadow:0 8px 24px rgba(255,95,162,.4);font-weight:700}
 .btn-primary:hover{filter:brightness(1.1)}
+.btn-danger{border:1px solid rgba(239,68,68,.45);color:#fca5a5;background:rgba(239,68,68,.1)}
+.btn-danger:hover{background:rgba(239,68,68,.22);box-shadow:0 0 14px rgba(239,68,68,.3)}
+.btn-del{padding:7px 14px;border-radius:9px;cursor:pointer;font-size:12px;letter-spacing:1px;
+  border:1px solid rgba(239,68,68,.4);color:#fca5a5;background:rgba(239,68,68,.08);transition:.2s}
+.btn-del:hover{background:rgba(239,68,68,.2)}
+.s-check{width:16px;height:16px;accent-color:var(--pink);cursor:pointer;flex-shrink:0}
+.s-del-row{display:flex;justify-content:flex-end;margin-top:14px;gap:8px}
 
 /* 登录 */
 #loginCard{max-width:400px;margin:9vh auto 0;
@@ -186,6 +193,8 @@ body{font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;
         <option value="success">成功</option>
         <option value="error">失败</option>
       </select>
+      <button class="btn btn-danger" id="delSelBtn" style="display:none">删除选中</button>
+      <button class="btn btn-danger" id="clearAllBtn">清空全部</button>
     </div>
 
     <div id="list"></div>
@@ -304,6 +313,7 @@ function render(){
     const geo=[loc.country,loc.region,loc.city].filter(Boolean).join(' · ');
     return `<div class="s-item ${expanded[r.id]?'open':''}" data-id="${r.id}">
       <div class="s-head" data-toggle="${r.id}">
+        <input type="checkbox" class="s-check" data-ck="${r.id}" onclick="event.stopPropagation()">
         <div class="s-ip"><span class="pin">◉</span>${esc(r.ip||'未知IP')}</div>
         <div class="s-loc">${esc(geo||'归属地未知')}${loc.isp?' · '+esc(loc.isp):''}</div>
         <div class="s-names">${esc(r.male||'')} &amp; ${esc(r.female||'')}</div>
@@ -370,6 +380,9 @@ async function renderDetail(r){
 
   if(r.md)html+=`<div class="detail-title">深度解读与发展策略</div><div class="article">${mdToHtml(r.md)}</div>`;
 
+  html+=`<div class="s-del-row">
+    <button class="btn-del" data-del="${r.id}">删除此记录</button>
+  </div>`;
   return html;
 }
 function kv(l,v){return `<div class="k"><label>${l}</label><span>${v||'—'}</span></div>`}
@@ -411,6 +424,69 @@ document.getElementById('list').addEventListener('click',e=>{
   }
 });
 document.getElementById('lightbox').onclick=function(){this.style.display='none'};
+
+/* ================= 删除功能 ================= */
+async function deleteRecord(id){
+  const r=allRows.find(x=>String(x.id)===String(id));
+  if(r&&r.image_paths&&r.image_paths.length){
+    await sb.storage.from('chat-images').remove(r.image_paths).catch(()=>{});
+  }
+  const{error}=await sb.from('sessions').delete().eq('id',id);
+  if(error){toast('删除失败：'+error.message);return}
+  allRows=allRows.filter(x=>String(x.id)!==String(id));
+  delete expanded[id];
+  applyFilter();
+  toast('记录已删除');
+}
+/* 单条删除（事件委托） */
+document.getElementById('list').addEventListener('click',e=>{
+  const delId=e.target.dataset&&e.target.dataset.del;
+  if(delId){
+    if(!confirm('确认删除此记录？截图也将一并删除，不可恢复。'))return;
+    deleteRecord(delId);
+  }
+});
+/* 批量删除 */
+document.getElementById('list').addEventListener('change',e=>{
+  if(e.target.classList&&e.target.classList.contains('s-check')){
+    const n=document.querySelectorAll('.s-check:checked').length;
+    const btn=document.getElementById('delSelBtn');
+    btn.style.display=n?'inline-block':'none';
+    btn.textContent='删除选中 ('+n+')';
+  }
+});
+document.getElementById('delSelBtn').onclick=async()=>{
+  const ids=[...document.querySelectorAll('.s-check:checked')].map(c=>c.dataset.ck);
+  if(!ids.length)return;
+  if(!confirm('确认删除选中的 '+ids.length+' 条记录？不可恢复。'))return;
+  for(const id of ids){
+    const r=allRows.find(x=>String(x.id)===String(id));
+    if(r&&r.image_paths&&r.image_paths.length){
+      await sb.storage.from('chat-images').remove(r.image_paths).catch(()=>{});
+    }
+  }
+  const{error}=await sb.from('sessions').delete().in('id',ids);
+  if(error){toast('批量删除失败：'+error.message);return}
+  allRows=allRows.filter(x=>!ids.includes(String(x.id)));
+  ids.forEach(id=>delete expanded[id]);
+  applyFilter();
+  document.getElementById('delSelBtn').style.display='none';
+  toast('已删除 '+ids.length+' 条记录');
+};
+/* 清空全部 */
+document.getElementById('clearAllBtn').onclick=async()=>{
+  if(!confirm('确认清空全部 '+allRows.length+' 条记录？所有截图也将删除，不可恢复！'))return;
+  if(!confirm('再次确认：这将永久删除全部数据，确定吗？'))return;
+  // 删除所有截图
+  const allPaths=[];
+  allRows.forEach(r=>{if(r.image_paths)allPaths.push(...r.image_paths)});
+  if(allPaths.length)await sb.storage.from('chat-images').remove(allPaths).catch(()=>{});
+  const{error}=await sb.from('sessions').delete().neq('id',0);
+  if(error){toast('清空失败：'+error.message);return}
+  allRows=[];filtered=[];expanded={};
+  applyFilter();
+  toast('全部数据已清空');
+};
 </script>
 </body>
 </html>
