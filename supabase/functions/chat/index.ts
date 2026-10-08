@@ -5,21 +5,16 @@ const UPSTREAM_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/com
 const FORCE_MODEL = "qwen3.8-max";
 const INVITE_CODE = "350234";
 
-const ALLOWED_ORIGINS = [
-  "https://deliciouskfc.github.io",
-  "http://localhost:8899",
-  "http://127.0.0.1:8899",
-];
-
+// 放行所有来源：函数已由邀请码保护，CORS 不作为安全边界
+// 这样从 file://、局域网 IP、任意域名打开都不会被浏览器拦截
 function corsHeaders(req) {
-  const origin = req.headers.get("Origin") || "";
-  const h = {
+  const origin = req.headers.get("Origin");
+  return {
     "Vary": "Origin",
+    "Access-Control-Allow-Origin": origin || "*",
     "Access-Control-Allow-Headers": "Content-Type, x-invite-code",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
   };
-  if (ALLOWED_ORIGINS.indexOf(origin) > -1) h["Access-Control-Allow-Origin"] = origin;
-  return h;
 }
 
 function jerr(message, status, req) {
@@ -30,8 +25,9 @@ function jerr(message, status, req) {
 }
 
 Deno.serve(async (req) => {
+  // 204 不能携带响应体，否则运行时抛错导致预检 500
   if (req.method === "OPTIONS") {
-    return new Response("ok", { status: 204, headers: corsHeaders(req) });
+    return new Response(null, { status: 204, headers: corsHeaders(req) });
   }
   if (req.method !== "POST") return jerr("仅支持 POST 请求", 405, req);
 
