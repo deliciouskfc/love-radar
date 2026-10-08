@@ -142,6 +142,7 @@ body{font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;
   <div id="loginCard">
     <h2>ADMIN CONSOLE</h2>
     <p>Love Radar 数据管理后台 · 仅限管理员</p>
+    <p style="color:#8d7bb3;font-size:11.5px;letter-spacing:.5px;margin-bottom:18px">提示：输入密码前请切换到英文键盘；系统会自动把全角字符转为半角</p>
     <div class="field">
       <label>管理员邮箱</label>
       <input id="email" type="email" placeholder="admin@example.com"
@@ -222,14 +223,19 @@ document.getElementById('eyeBtn').onclick=()=>{
   if(p.type==='password'){p.type='text';b.textContent='隐藏'}
   else{p.type='password';b.textContent='显示'}
 };
-/* 登录（去除首尾空格，防止手机误输入空白） */
+/* 全角转半角（手机中文键盘常误输入全角 ＠ ０ 等，肉眼难辨） */
+function toHalfWidth(s){
+  return s.replace(/[\uFF01-\uFF5E]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0))
+          .replace(/\u3000/g,' ');
+}
+/* 登录（归一化 + 去除首尾空格，防止手机误输入） */
 document.getElementById('loginBtn').onclick=async()=>{
-  const email=document.getElementById('email').value.trim();
-  const pass=document.getElementById('pass').value.trim();
+  const email=toHalfWidth(document.getElementById('email').value).trim();
+  const pass=toHalfWidth(document.getElementById('pass').value).trim();
   document.getElementById('email').value=email;
   document.getElementById('pass').value=pass;
   const{error}=await sb.auth.signInWithPassword({email,pass});
-  if(error)toast('登录失败：'+error.message);
+  if(error)toast('登录失败：'+error.message+'（密码长度'+pass.length+'）');
 };
 document.getElementById('logoutBtn').onclick=()=>sb.auth.signOut();
 
