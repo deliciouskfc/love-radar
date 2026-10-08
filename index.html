@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>暧昧指数测评 · Love Radar v3.2</title>
+<title>暧昧指数测评 · Love Radar v3.3</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
 :root{
@@ -551,7 +551,7 @@ footer{text-align:center;margin-top:56px;color:rgba(185,168,217,.5);font-size:12
 <div id="toast"></div>
 
 <script>
-console.log('%cLove Radar v3.2 loaded','color:#e879f9;font-weight:bold');
+console.log('%cLove Radar v3.3 loaded','color:#e879f9;font-weight:bold');
 /* ================= 星空背景 ================= */
 (function(){
   const c=document.getElementById('stars'),x=c.getContext('2d');let W,H,stars=[];
@@ -714,7 +714,7 @@ function termClear(title){
   $('term').textContent='';
   if(title)$('termTitle').textContent=title;
 }
-async function chat({messages,temperature=.7,onToken,onReason}){
+async function chat({messages,temperature=.7,onToken,onReason,enableThinking}){
   const streaming = typeof onToken==='function';
   /* 单轮流式请求：返回 {content, reasoning, cut}，cut=流被中途掐断 */
   async function streamOnce(msgs){
@@ -724,7 +724,7 @@ async function chat({messages,temperature=.7,onToken,onReason}){
         resp=await fetch(EDGE_URL,{
           method:'POST',
           headers:{'Content-Type':'application/json','x-invite-code':INVITE_CODE},
-          body:JSON.stringify({messages:msgs,temperature})
+          body:JSON.stringify({messages:msgs,temperature, ...(enableThinking===false?{enable_thinking:false}:{})})
         });
       }else{
         const base=$('baseUrl').value.trim().replace(/\/+$/,'');
@@ -912,7 +912,7 @@ $('startBtn').addEventListener('click',async()=>{
     const content=[{type:'text',text:buildAnalysisPrompt(male,female,$('extraInfo').value.trim())}];
     compressed.forEach(d=>content.push({type:'image_url',image_url:{url:d}}));
     const thinkC=mkCounter('AI 深度思考中','reason'),outC=mkCounter('AI 正式输出','content');
-    let raw=await chat({messages:[{role:'user',content}],temperature:.3,onToken:t=>outC.push(t),onReason:t=>thinkC.push(t)});
+    let raw=await chat({messages:[{role:'user',content}],temperature:.3,enableThinking:false,onToken:t=>outC.push(t),onReason:t=>thinkC.push(t)});
     thinkC.done();outC.done();
     setStep(3,'正在计算十五维度评分…',50);
     termWriteSys('\n\n> 评分数据接收完毕，正在解析…\n');
@@ -924,7 +924,7 @@ $('startBtn').addEventListener('click',async()=>{
       console.log('[debug] raw:', raw);
       const retryParts=[{type:'text',text:content[0].text+'\n\n【再次强调】你上一次回复没有输出合法的评分JSON（可能只输出了思考过程）。请直接给出最终答案：严格只输出一个纯JSON对象，以 { 开头、以 } 结尾，包含 overall_score、overall_verdict、dimensions（15个维度）、summary 字段。禁止输出任何思考过程、解释文字或markdown代码块。'},...content.slice(1)];
       const rThink=mkCounter('重试思考中','reason'),rOut=mkCounter('重试输出','content');
-      raw=await chat({messages:[{role:'user',content:retryParts}],temperature:.2,onToken:t=>rOut.push(t),onReason:t=>rThink.push(t)});
+      raw=await chat({messages:[{role:'user',content:retryParts}],temperature:.2,enableThinking:false,onToken:t=>rOut.push(t),onReason:t=>rThink.push(t)});
       rThink.done();rOut.done();
       data=parseJSON(raw);
     }

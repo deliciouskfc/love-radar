@@ -79,9 +79,12 @@ Deno.serve(async (req) => {
         model: FORCE_MODEL,
         messages,
         temperature: typeof payload.temperature === "number" ? payload.temperature : 0.7,
-        // 思考模型 reasoning 会占用输出预算，上限不足会导致 content 为空
+        // 思考模型 reasoning 会占用输出预算、吃满 150s 墙钟，导致 content（JSON）迟迟不出现
         max_tokens: 65536,
         stream: true,
+        // 评分等结构化场景由前端传 enable_thinking:false，直接输出 content，避开超长思考链
+        ...(payload.enable_thinking === false ? { enable_thinking: false } : {}),
+        ...(typeof payload.reasoning_effort === "string" ? { reasoning_effort: payload.reasoning_effort } : {}),
       }),
     });
   } catch (e) {
