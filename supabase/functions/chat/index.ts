@@ -37,12 +37,22 @@ Deno.serve(async (req) => {
   const upstreamKey = Deno.env.get("UPSTREAM_KEY");
   if (!upstreamKey) return jerr("服务端未配置 UPSTREAM_KEY", 500, req);
 
-  // ③ 请求体
+  // ③ 请求体大小保护（超过 4MB 直接拒绝，避免撑爆函数内存）
+  const len = parseInt(req.headers.get("content-length") || "0", 10);
+  if (len > 4 * 1024 * 1024) {
+    return jerr("图片体积过大，请删除几张截图或换更小的图片后重试", 413, req);
+  }
+
+  // ④ 请求体
   let payload;
   try {
     payload = await req.json();
   } catch {
     return jerr("请求体不是合法 JSON", 400, req);
+  }
+  // 运行时再校验一次实际大小（content-length 可能缺失）
+  if (JSON.stringify(payload).length > 4 * 1024 * 1024) {
+    return jerr("图片体积过大，请删除几张截图或换更小的图片后重试", 413, req);
   }
   const messages = Array.isArray(payload.messages) ? payload.messages : null;
   if (!messages || messages.length === 0) return jerr("缺少有效的 messages", 400, req);

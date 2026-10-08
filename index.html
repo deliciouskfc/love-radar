@@ -673,14 +673,17 @@ function renderThumbs(){
   document.querySelectorAll('.thumb .del').forEach(b=>b.onclick=()=>{images.splice(+b.dataset.i,1);renderThumbs()});
 }
 /* 压缩图片，控制 token 消耗 */
-function compress(dataUrl,maxW=1400,q=.82){
+function compress(dataUrl,maxW=900,q=0.6,maxH=3500){
   return new Promise(res=>{
     const img=new Image();
     img.onload=()=>{
       let{width:w,height:h}=img;
       if(w>maxW){h=h*maxW/w;w=maxW}
-      const cv=document.createElement('canvas');cv.width=w;cv.height=h;
-      cv.getContext('2d').drawImage(img,0,0,w,h);
+      // 长图（长屏截屏）限制总高度，避免请求体过大撑爆 Edge Function 内存
+      if(h>maxH){w=w*maxH/h;h=maxH}
+      const cv=document.createElement('canvas');
+      cv.width=Math.max(1,Math.round(w));cv.height=Math.max(1,Math.round(h));
+      cv.getContext('2d').drawImage(img,0,0,cv.width,cv.height);
       res(cv.toDataURL('image/jpeg',q));
     };
     img.onerror=()=>res(dataUrl);
@@ -871,7 +874,7 @@ $('startBtn').addEventListener('click',async()=>{
     termWriteSys(`> 准备上传 ${images.length} 张聊天截图\n> 正在压缩图片以节省 token…\n`);
     const compressed=[];
     for(let i=0;i<images.length;i++){
-      compressed.push(await compress(images[i].dataUrl));
+      compressed.push(await compress(images[i].dataUrl,900,0.6,3500));
       setStep(1,`正在压缩图片 ${i+1}/${images.length}…`,8+i*2);
     }
     termWriteSys('> 图片处理完毕，开始呼叫 AI…\n\n');
