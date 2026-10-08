@@ -1,7 +1,7 @@
 // Love Radar · 邀请码安全中转（零外部依赖，流式透传）
 // 上游 API Key 只存在服务端；前端拿到的是模型原始 SSE 流
 const UPSTREAM_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions";
-const FORCE_MODEL = "qwen3.8-max";
+const FORCE_MODEL = "qwen3.8-flash";
 const INVITE_CODE = "350234";
 
 // 放行所有来源：函数已由邀请码保护，CORS 不作为安全边界
