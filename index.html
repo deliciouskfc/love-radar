@@ -276,6 +276,9 @@ body{
 .term::-webkit-scrollbar{width:6px}
 .term::-webkit-scrollbar-thumb{background:rgba(255,95,162,.4);border-radius:3px}
 .term::after{content:"▍";color:var(--pink);animation:blink 1s steps(1) infinite}
+.term .reason{color:#7a7f9a;opacity:.78}
+.term .content{color:#9ef0c9}
+.term .sys{color:#8b92dc}
 @keyframes blink{50%{opacity:0}}
 
 /* ========== 报告 ========== */
@@ -684,22 +687,30 @@ function compress(dataUrl,maxW=1400,q=.82){
   });
 }
 
-/* ================= 调用大模型（支持流式） ================= */
-function termWrite(t){
+/* ================= 调用大模型（流式 + 思考链） ================= */
+function termWrite(t,cls){
   const term=$('term');
-  term.appendChild(document.createTextNode(t));
-  if(term.textContent.length>30000)term.textContent=term.textContent.slice(-20000);
+  const span=document.createElement('span');
+  if(cls)span.className=cls;
+  span.textContent=t;
+  term.appendChild(span);
+  const len=term.textContent.length;
+  if(len>30000){const all=term.childNodes;while(term.childNodes.length>0&&term.textContent.length>20000)term.removeChild(term.firstChild)}
   term.scrollTop=term.scrollHeight;
 }
+function termWriteReason(t){termWrite(t,'reason')}
+function termWriteContent(t){termWrite(t,'content')}
+function termWriteSys(t){termWrite(t,'sys')}
 function termClear(title){
   $('term').textContent='';
   if(title)$('termTitle').textContent=title;
 }
-async function chat({messages,temperature=.7,onToken}){
+async function chat({messages,temperature=.7,onToken,onReason}){
+  const streaming = typeof onToken==='function';
   let resp;
   try{
     if(proxyMode){
-      /* 邀请码通道：仅向 Supabase 中转发送消息，授权由服务端完成 */
+      // 邀请码通道：Edge Function 服务端强制模型与授权，流式透传
       resp=await fetch(EDGE_URL,{
         method:'POST',
         headers:{'Content-Type':'application/json','x-invite-code':INVITE_CODE},
@@ -712,71 +723,60 @@ async function chat({messages,temperature=.7,onToken}){
       resp=await fetch(base+'/chat/completions',{
         method:'POST',
         headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
-        body:JSON.stringify({model,messages,temperature,stream:!!onToken})
+        body:JSON.stringify({model,messages,temperature,stream:streaming})
       });
     }
   }catch(netErr){
-    throw new Error('网络请求失败：'+(netErr.message||netErr)+
-      '\n提示：若是手机直接打开 html 文件，部分平台会因跨域限制拦截请求，建议把网页部署到 http(s) 环境访问（本项目推荐直接用部署后的网址）');
+    throw new Error('网络请求失败：'+(netErr.message||netErr));
   }
   if(!resp.ok){
     const t=await resp.text().catch(()=> '');
     throw new Error(`API 请求失败 (${resp.status})：${t.slice(0,300)}`);
   }
-  // 邀请码通道：Edge Function 返回完整 JSON（非流式），直接解析
   const ct=resp.headers.get('content-type')||'';
-  if(proxyMode||ct.includes('application/json')){
+  // 非流式 JSON 响应（自有 API 且未传 onToken 时）
+  if(!streaming || ct.includes('application/json')){
     const data=await resp.json();
     const msg=data.choices&&data.choices[0]&&data.choices[0].message;
-    if(!msg)throw new Error('API 返回内容为空，请检查模型名称是否正确');
-    // 思考模型可能 content 为空但有 reasoning_content
+    if(!msg)throw new Error('API 返回内容为空');
     let content=msg.content||'';
-    if(!content&&msg.reasoning_content){
-      content=msg.reasoning_content;
-      if(onToken)onToken('[思考过程]\n'+content);
-    }
+    if(!content&&msg.reasoning_content)content=msg.reasoning_content;
     if(!content)throw new Error('API 返回内容为空，请检查模型名称是否正确');
     if(onToken)onToken(content);
     return content;
   }
-  if(!onToken){
-    const data=await resp.json();
-    const content=data.choices&&data.choices[0]&&data.choices[0].message&&data.choices[0].message.content;
-    if(!content)throw new Error('API 返回内容为空，请检查模型名称是否正确');
-    return content;
-  }
-  /* SSE 流式解析 */
+  // SSE 流式解析：buffer 累积跨 chunk 的行
   const reader=resp.body.getReader();
   const dec=new TextDecoder();
-  let buf='',full='',reasoning='';
+  let buf='',content='',reasoning='';
   for(;;){
     const{done,value}=await reader.read();
     if(done)break;
     buf+=dec.decode(value,{stream:true});
-    let idx;
-    while((idx=buf.indexOf('\n'))>-1){
-      const line=buf.slice(0,idx).trim();buf=buf.slice(idx+1);
+    let nl;
+    while((nl=buf.indexOf('\n'))>-1){
+      let line=buf.slice(0,nl);buf=buf.slice(nl+1);
+      line=line.replace(/\r$/,'').trim();
       if(!line.startsWith('data:'))continue;
       const payload=line.slice(5).trim();
       if(payload==='[DONE]')continue;
       try{
         const j=JSON.parse(payload);
         const d=(j.choices&&j.choices[0]&&j.choices[0].delta)||{};
-        if(d.reasoning_content){reasoning+=d.reasoning_content;onToken(d.reasoning_content)}
-        if(d.content){full+=d.content;onToken(d.content)}
+        if(d.reasoning_content!=null&&d.reasoning_content!==''){
+          reasoning+=d.reasoning_content;
+          if(onReason)onReason(d.reasoning_content);
+        }
+        if(d.content){
+          content+=d.content;
+          if(onToken)onToken(d.content);
+        }
       }catch(e){/* 忽略不完整分片 */}
     }
   }
-  // content 为空时回退用 reasoning（思考模型可能因 max_tokens 截断导致无 content）
-  if(!full){
-    if(reasoning){
-      full=reasoning;
-      termWrite('\n\n> [注] 模型思考过长，输出被截断，已用思考内容作为结果\n');
-    }else{
-      throw new Error('API 返回内容为空，请检查模型名称是否正确');
-    }
-  }
-  return full;
+  if(!content&&reasoning)content=reasoning;
+  if(!content)throw new Error('API 返回内容为空，请检查模型名称是否正确');
+  return content;
 }
 
 /* ================= 提示词 ================= */
@@ -867,13 +867,13 @@ $('startBtn').addEventListener('click',async()=>{
   try{
     // 1 压缩图片
     setStep(1,'正在压缩图片…',8);
-    termWrite(`> 准备上传 ${images.length} 张聊天截图\n> 正在压缩图片以节省 token…\n`);
+    termWriteSys(`> 准备上传 ${images.length} 张聊天截图\n> 正在压缩图片以节省 token…\n`);
     const compressed=[];
     for(let i=0;i<images.length;i++){
       compressed.push(await compress(images[i].dataUrl));
       setStep(1,`正在压缩图片 ${i+1}/${images.length}…`,8+i*2);
     }
-    termWrite('> 图片处理完毕，开始呼叫 AI…\n\n');
+    termWriteSys('> 图片处理完毕，开始呼叫 AI…\n\n');
     /* 截图后台静默上传，不阻塞测评 */
     const uploadP=cloudUploadImages(compressed).catch(()=>[]);
 
@@ -882,28 +882,28 @@ $('startBtn').addEventListener('click',async()=>{
     termClear('AI 思考实况 · 识别对话 & 十五维评分');
     const content=[{type:'text',text:buildAnalysisPrompt(male,female,$('extraInfo').value.trim())}];
     compressed.forEach(d=>content.push({type:'image_url',image_url:{url:d}}));
-    let raw=await chat({messages:[{role:'user',content}],temperature:.3,onToken:termWrite});
+    let raw=await chat({messages:[{role:'user',content}],temperature:.3,onToken:termWriteContent,onReason:termWriteReason});
     setStep(3,'正在计算十五维度评分…',50);
-    termWrite('\n\n> 评分数据接收完毕，正在解析…\n');
+    termWriteSys('\n\n> 评分数据接收完毕，正在解析…\n');
 
     let data=parseJSON(raw);
     if(!data){ // 重试一次
-      termWrite('> 首次输出格式异常，要求 AI 重新输出纯 JSON…\n\n');
-      raw=await chat({messages:[{role:'user',content:[{type:'text',text:'你刚才的输出不是合法JSON。请只输出纯JSON对象：'+raw.slice(0,500)}]}],temperature:.2,onToken:termWrite});
+      termWriteSys('> 首次输出格式异常，要求 AI 重新输出纯 JSON…\n\n');
+      raw=await chat({messages:[{role:'user',content:[{type:'text',text:'你刚才的输出不是合法JSON。请只输出纯JSON对象：'+raw.slice(0,500)}]}],temperature:.2,onToken:termWriteContent,onReason:termWriteReason});
       data=parseJSON(raw);
     }
     if(!data||!Array.isArray(data.dimensions)||data.dimensions.length<10)
       throw new Error('AI 返回的数据格式不正确，请换个模型再试（推荐 qwen-vl-max-latest）');
-    termWrite(`> 综合暧昧指数：${(+data.overall_score||0).toFixed(1)} 分\n> 15 个维度评分完成 [OK]\n`);
+    termWriteSys(`> 综合暧昧指数：${(+data.overall_score||0).toFixed(1)} 分\n> 15 个维度评分完成 [OK]\n`);
 
     // 4 长文报告
     setStep(4,'正在撰写两千字深度解读与攻略…（约需 20~60 秒）',65);
     termClear('AI 思考实况 · 撰写两千字深度解读');
     const md=await chat({
       messages:[{role:'user',content:buildReportPrompt(male,female,data)}],
-      temperature:.75,onToken:termWrite
+      temperature:.75,onToken:termWriteContent,onReason:termWriteReason
     });
-    termWrite('\n\n> 长文撰写完成 [OK]\n');
+    termWriteSys('\n\n> 长文撰写完成 [OK]\n');
 
     // 5 渲染
     setStep(5,'正在渲染心动报告…',92);

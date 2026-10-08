@@ -1,12 +1,10 @@
-// Love Radar · 邀请码安全中转（零外部依赖）
-// 上游 API Key 只存在服务端：前端任何方式都无法获取
-// 邀请码校验 + 模型服务端强制 + 流式透传 + 调用日志
+// Love Radar · 邀请码安全中转（零外部依赖，流式透传）
+// 上游 API Key 只存在服务端；前端拿到的是模型原始 SSE 流
 const UPSTREAM_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions";
 const FORCE_MODEL = "qwen3.8-max";
 const INVITE_CODE = "350234";
 
 // 放行所有来源：函数已由邀请码保护，CORS 不作为安全边界
-// 这样从 file://、局域网 IP、任意域名打开都不会被浏览器拦截
 function corsHeaders(req) {
   const origin = req.headers.get("Origin");
   return {
@@ -25,7 +23,7 @@ function jerr(message, status, req) {
 }
 
 Deno.serve(async (req) => {
-  // 204 不能携带响应体，否则运行时抛错导致预检 500
+  // 204 不能携带响应体
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders(req) });
   }
@@ -58,7 +56,7 @@ Deno.serve(async (req) => {
     }
   }
 
-  // ④ 转发上游（非流式，返回完整 JSON）
+  // ④ 转发上游（流式，模型与上游 URL 由服务端强制，不设 max_tokens）
   let upstream;
   try {
     upstream = await fetch(UPSTREAM_URL, {
@@ -71,7 +69,7 @@ Deno.serve(async (req) => {
         model: FORCE_MODEL,
         messages,
         temperature: typeof payload.temperature === "number" ? payload.temperature : 0.7,
-        stream: false,
+        stream: true,
       }),
     });
   } catch (e) {
@@ -88,17 +86,21 @@ Deno.serve(async (req) => {
     );
   }
 
-  // 读取完整响应
-  const data = await upstream.json();
   await logUsage(req, messages.length, hasImages, upstream.status, null);
 
-  return new Response(JSON.stringify(data), {
+  // ⑤ 流式原样透传，CORS 头加在流式响应上
+  return new Response(upstream.body, {
     status: 200,
-    headers: { "Content-Type": "application/json", ...corsHeaders(req) },
+    headers: {
+      "Content-Type": "text/event-stream; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform",
+      "Connection": "keep-alive",
+      ...corsHeaders(req),
+    },
   });
 });
 
-// 调用日志：用原生 fetch 写 PostgREST（service role 自动注入，绕过 RLS）
+// 调用日志
 async function logUsage(req, msgCount, hasImages, status, error) {
   try {
     const sbUrl = Deno.env.get("SUPABASE_URL");
