@@ -70,7 +70,6 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         model: FORCE_MODEL,
         messages,
-        max_tokens: typeof payload.max_tokens === "number" ? payload.max_tokens : 8000,
         temperature: typeof payload.temperature === "number" ? payload.temperature : 0.7,
         stream: true,
       }),
