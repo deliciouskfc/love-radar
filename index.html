@@ -863,20 +863,18 @@ $('startBtn').addEventListener('click',async()=>{
     termClear('AI 思考实况 · 识别对话 & 十五维评分');
     const content=[{type:'text',text:buildAnalysisPrompt(male,female,$('extraInfo').value.trim())}];
     compressed.forEach(d=>content.push({type:'image_url',image_url:{url:d}}));
-    let raw=await chat({messages:[{role:'system',content:'你是一个只会输出JSON的API接口。用户发送聊天截图和分析指令，你只回复一个纯JSON对象，不要有任何其他文字、不要用markdown代码块包裹、不要解释。第一个字符必须是{，最后一个字符必须是}。'},{role:'user',content}],temperature:.3,onToken:termWrite});
+    let raw=await chat({messages:[{role:'user',content}],temperature:.3,onToken:termWrite});
     setStep(3,'正在计算十五维度评分…',50);
     termWrite('\n\n> 评分数据接收完毕，正在解析…\n');
-    termWrite('> 收到原始内容长度：'+raw.length+' 字符\n');
-    termWrite('> 前200字符预览：'+raw.slice(0,200)+'\n');
 
     let data=parseJSON(raw);
     if(!data){ // 重试一次
       termWrite('> 首次输出格式异常，要求 AI 重新输出纯 JSON…\n\n');
-      raw=await chat({messages:[{role:'system',content:'你是一个只会输出JSON的API接口。只回复纯JSON对象，第一个字符必须是{，最后一个字符必须是}。'},{role:'user',content:[{type:'text',text:'你刚才的输出不是合法JSON。请只输出纯JSON对象，不要markdown代码块：'+raw.slice(0,800)}]}],temperature:.2,onToken:termWrite});
+      raw=await chat({messages:[{role:'user',content:[{type:'text',text:'你刚才的输出不是合法JSON。请只输出纯JSON对象：'+raw.slice(0,500)}]}],temperature:.2,onToken:termWrite});
       data=parseJSON(raw);
     }
     if(!data||!Array.isArray(data.dimensions)||data.dimensions.length<10)
-      throw new Error('AI 返回的数据格式不正确（收到 '+raw.length+' 字符，前200字：'+raw.slice(0,200)+'）。请重试或换模型。');
+      throw new Error('AI 返回的数据格式不正确，请换个模型再试（推荐 qwen-vl-max-latest）');
     termWrite(`> 综合暧昧指数：${(+data.overall_score||0).toFixed(1)} 分\n> 15 个维度评分完成 [OK]\n`);
 
     // 4 长文报告
