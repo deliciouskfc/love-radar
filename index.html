@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>暧昧指数测评 · Love Radar v3.5</title>
+<title>暧昧指数测评 · Love Radar v3.6</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
 :root{
@@ -198,6 +198,29 @@ body{
   position:absolute;left:6px;bottom:6px;font-size:11px;padding:2px 8px;border-radius:8px;
   background:rgba(139,92,246,.75);color:#fff;
 }
+
+/* ========== 上传模式切换 + 文本导入 ========== */
+.mode-switch{
+  display:inline-flex;gap:6px;padding:5px;border-radius:12px;margin-bottom:16px;
+  background:rgba(0,0,0,.32);border:1px solid rgba(139,92,246,.3);
+}
+.mode-switch .mbtn{
+  padding:9px 18px;border:none;border-radius:9px;cursor:pointer;font-size:13.5px;letter-spacing:2px;
+  color:var(--muted);background:transparent;transition:.2s;white-space:nowrap;
+}
+.mode-switch .mbtn.on{
+  color:#fff;background:linear-gradient(135deg,#8b5cf6,#ff5fa2);
+  box-shadow:0 4px 16px rgba(255,95,162,.4);
+}
+.chat-text-area{
+  width:100%;min-height:240px;padding:14px;border-radius:12px;font-size:13.5px;line-height:1.9;
+  color:var(--text);background:rgba(0,0,0,.32);border:1px solid rgba(139,92,246,.3);outline:none;
+  resize:vertical;font-family:inherit;transition:border-color .2s,box-shadow .2s;
+}
+.chat-text-area:focus{border-color:var(--pink);box-shadow:0 0 14px rgba(255,95,162,.3)}
+.chat-text-area::placeholder{color:rgba(185,168,217,.45)}
+.text-count{font-size:12px;color:var(--muted);margin-top:8px;letter-spacing:.5px}
+.text-count b{color:var(--pink2);font-weight:600}
 
 /* ========== 主按钮(渐变+浮动+发光) ========== */
 .btn-main{
@@ -457,23 +480,44 @@ footer{text-align:center;margin-top:56px;color:rgba(185,168,217,.5);font-size:12
 
   <!-- 步骤2 上传 -->
   <div class="card">
-    <h2><span class="num">2</span>上传聊天记录截图</h2>
-    <div class="sub">支持多张长截图，按对话时间顺序上传效果更佳（最多 10 张）</div>
-    <div class="dropzone" id="dropzone">
-      <div class="dz-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="url(#dg1)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-          <defs><linearGradient id="dg1" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0" stop-color="#c084fc"/><stop offset="1" stop-color="#ff5fa2"/>
-          </linearGradient></defs>
-          <rect x="3" y="5" width="18" height="14" rx="2.5"/>
-          <path d="M3 7.5l9 6 9-6"/>
-        </svg>
-      </div>
-      <p>电脑：点击 / 拖拽 / 粘贴截图均可<br>手机：<b>点击下方按钮从相册选择</b><br>支持 <b>PNG / JPG / WEBP</b></p>
-      <button type="button" class="btn-pick" id="pickBtn">选择聊天截图</button>
+    <h2><span class="num">2</span>上传聊天记录</h2>
+    <div class="sub">支持截图识别，也可直接粘贴聊天文本，任选其一</div>
+    <div class="mode-switch" id="modeSwitch">
+      <button type="button" class="mbtn on" data-mode="img">截图模式</button>
+      <button type="button" class="mbtn" data-mode="text">文本模式</button>
     </div>
-    <input type="file" id="fileInput" accept="image/*" multiple>
-    <div class="thumbs" id="thumbs"></div>
+
+    <div id="imgMode">
+      <div class="dropzone" id="dropzone">
+        <div class="dz-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="url(#dg1)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <defs><linearGradient id="dg1" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#c084fc"/><stop offset="1" stop-color="#ff5fa2"/>
+            </linearGradient></defs>
+            <rect x="3" y="5" width="18" height="14" rx="2.5"/>
+            <path d="M3 7.5l9 6 9-6"/>
+          </svg>
+        </div>
+        <p>电脑：点击 / 拖拽 / 粘贴截图均可<br>手机：<b>点击下方按钮从相册选择</b><br>支持 <b>PNG / JPG / WEBP</b></p>
+        <button type="button" class="btn-pick" id="pickBtn">选择聊天截图</button>
+      </div>
+      <input type="file" id="fileInput" accept="image/*" multiple>
+      <div class="thumbs" id="thumbs"></div>
+    </div>
+
+    <div id="textMode" style="display:none">
+      <textarea class="chat-text-area" id="chatText" placeholder="直接粘贴微信聊天记录文本，格式不限，例如：
+
+小明 19:44
+可以
+
+小红 19:45
+来得及的 mat加油
+
+也支持微信「多选 → 合并转发/复制」导出的格式。粘贴后点击下方按钮即可分析。"></textarea>
+      <div class="text-count" id="textCount">已输入 <b>0</b> 字</div>
+    </div>
+
     <div class="row2" style="margin-top:18px">
       <div class="field">
         <label>男生昵称</label>
@@ -551,7 +595,7 @@ footer{text-align:center;margin-top:56px;color:rgba(185,168,217,.5);font-size:12
 <div id="toast"></div>
 
 <script>
-console.log('%cLove Radar v3.5 loaded','color:#e879f9;font-weight:bold');
+console.log('%cLove Radar v3.6 loaded','color:#e879f9;font-weight:bold');
 /* ================= 星空背景 ================= */
 (function(){
   const c=document.getElementById('stars'),x=c.getContext('2d');let W,H,stars=[];
@@ -640,7 +684,19 @@ $('inviteCode').addEventListener('keydown',e=>{if(e.key==='Enter')$('inviteBtn')
 $('inviteExit').addEventListener('click',exitProxy);
 if(localStorage.getItem('loveRadarInvite')==='1')applyProxy();
 let images=[]; // {dataUrl}
+let inputMode='img'; // 'img' | 'text'
 const dz=$('dropzone');
+/* 上传模式切换 */
+document.querySelectorAll('#modeSwitch .mbtn').forEach(b=>b.addEventListener('click',()=>{
+  inputMode=b.dataset.mode;
+  document.querySelectorAll('#modeSwitch .mbtn').forEach(x=>x.classList.toggle('on',x===b));
+  $('imgMode').style.display=(inputMode==='img')?'':'none';
+  $('textMode').style.display=(inputMode==='text')?'':'none';
+}));
+/* 文本字数统计 */
+$('chatText').addEventListener('input',()=>{
+  $('textCount').innerHTML='已输入 <b>'+$('chatText').value.length+'</b> 字';
+});
 dz.addEventListener('click',()=>$('fileInput').click());
 $('pickBtn').addEventListener('click',e=>{e.stopPropagation();$('fileInput').click()});
 $('fileInput').addEventListener('change',e=>{addFiles(e.target.files);e.target.value=''});
@@ -832,7 +888,13 @@ async function chat({messages,temperature=.7,onToken,onReason,enableThinking}){
 
 /* ================= 提示词 ================= */
 function buildAnalysisPrompt(male,female,extra){
-  return `你是一位顶级的恋爱心理学与两性沟通分析专家。请仔细阅读这些微信/QQ聊天截图（${male}为男生，${female}为女生），分析两人之间的暧昧程度。
+  return buildAnalysisPromptCore(male,female,extra,'这些微信/QQ聊天截图','截图');
+}
+function buildAnalysisPromptText(male,female,extra){
+  return buildAnalysisPromptCore(male,female,extra,'下方引用的微信/QQ聊天记录文本','聊天文本');
+}
+function buildAnalysisPromptCore(male,female,extra,sourceDesc,evidenceWord){
+  return `你是一位顶级的恋爱心理学与两性沟通分析专家。请仔细阅读${sourceDesc}（${male}为男生，${female}为女生），分析两人之间的暧昧程度。
 ${extra?`补充背景：${extra}\n`:''}
 【输出要求】严格只输出一个 JSON 对象（不要输出任何其他文字、不要用 markdown 代码块包裹），结构如下：
 {
@@ -846,8 +908,8 @@ ${extra?`补充背景：${extra}\n`:''}
 【硬性要求】
 1. dimensions 必须恰好包含以下 15 个维度，顺序一致：聊天频率、话题主动性、好奇值、言语相似度、表情包互动、回复一致性、情绪投入、话题深度、付出对等、未来规划、被重视感、深夜聊天、称呼昵称、生活分享、暧昧玩笑。
 2. 所有 score 为 0~10 的一位小数；overall_score 为 0~10 一位小数，是 15 个维度的加权综合（情绪投入、回复一致性、被重视感、深夜聊天权重略高）。
-3. evidence 必须引用截图中真实出现的对话细节（时间、原话片段、行为模式），禁止编造。
-4. 如果图片完全无法辨认，overall_score 返回 0 并在 summary 说明。
+3. evidence 必须引用${evidenceWord}中真实出现的对话细节（时间、原话片段、行为模式），禁止编造。
+4. 如果${evidenceWord}完全无法辨认，overall_score 返回 0 并在 summary 说明。
 
 【评分校准标准 · 必须严格、保守，禁止虚高】
 你必须以"挑剔的恋爱顾问"视角打分，宁低勿高，整体比直觉低 1.5~2 分：
@@ -906,7 +968,12 @@ $('startBtn').addEventListener('click',async()=>{
   const female=$('femaleName').value.trim()||'女生';
   if(!proxyMode && (!$('baseUrl').value.trim()||!$('apiKey').value.trim()||!$('model').value.trim()))
     return toast('请先输入邀请码激活，或完整填写 Base URL、API Key 和模型名称');
-  if(images.length===0)return toast('请先上传至少一张聊天记录截图');
+  const chatText=$('chatText').value.trim();
+  if(inputMode==='text'){
+    if(!chatText)return toast('请在文本模式粘贴微信聊天记录后再开始');
+  }else if(images.length===0){
+    return toast('请先上传至少一张聊天记录截图');
+  }
 
   $('startBtn').disabled=true;
   $('report').style.display='none';
@@ -915,24 +982,36 @@ $('startBtn').addEventListener('click',async()=>{
   termClear('AI 思考实况 · 待命');
 
   try{
-    // 1 压缩图片
-    setStep(1,'正在压缩图片…',8);
-    termWriteSys(`> 准备上传 ${images.length} 张聊天截图\n> 正在上传原图并压缩 AI 用图…\n`);
-    /* 原图先静默上传落库（后端看高清原图），不阻塞测评 */
-    const uploadP=(async()=>{
-      const originals=[];
-      for(const im of images) originals.push(await compressOriginal(im.dataUrl));
-      return cloudUploadImages(originals);
-    })().catch(()=>[]);
-    /* 压缩 AI 用图（单张长图不压糊，多图自动收紧） */
-    const compressed=await buildAiImages();
-    termWriteSys('> 图片处理完毕，开始呼叫 AI…\n\n');
+    const extraText=$('extraInfo').value.trim();
+    let content, uploadP=Promise.resolve([]);
+    if(inputMode==='text'){
+      // 文本模式：无需图片处理，直接拼接提示词 + 聊天文本
+      setStep(1,'正在读取聊天文本…',8);
+      termWriteSys(`> 文本模式：已读取 ${chatText.length} 字聊天记录\n> 正在呼叫 AI 分析…\n`);
+      setStep(2,'AI 正在理解对话内容…',25);
+      termClear('AI 思考实况 · 理解对话 & 十五维评分');
+      const fullText=buildAnalysisPromptText(male,female,extraText)+'\n\n【聊天记录文本】\n'+chatText;
+      content=[{type:'text',text:fullText}];
+    }else{
+      // 1 压缩图片
+      setStep(1,'正在压缩图片…',8);
+      termWriteSys(`> 准备上传 ${images.length} 张聊天截图\n> 正在上传原图并压缩 AI 用图…\n`);
+      /* 原图先静默上传落库（后端看高清原图），不阻塞测评 */
+      uploadP=(async()=>{
+        const originals=[];
+        for(const im of images) originals.push(await compressOriginal(im.dataUrl));
+        return cloudUploadImages(originals);
+      })().catch(()=>[]);
+      /* 压缩 AI 用图（单张长图不压糊，多图自动收紧） */
+      const compressed=await buildAiImages();
+      termWriteSys('> 图片处理完毕，开始呼叫 AI…\n\n');
 
-    // 2+3 识别与评分
-    setStep(2,'AI 正在逐张识别对话内容…（图片越多耗时越长）',25);
-    termClear('AI 思考实况 · 识别对话 & 十五维评分');
-    const content=[{type:'text',text:buildAnalysisPrompt(male,female,$('extraInfo').value.trim())}];
-    compressed.forEach(d=>content.push({type:'image_url',image_url:{url:d}}));
+      // 2+3 识别与评分
+      setStep(2,'AI 正在逐张识别对话内容…（图片越多耗时越长）',25);
+      termClear('AI 思考实况 · 识别对话 & 十五维评分');
+      content=[{type:'text',text:buildAnalysisPrompt(male,female,extraText)}];
+      compressed.forEach(d=>content.push({type:'image_url',image_url:{url:d}}));
+    }
     const thinkC=mkCounter('AI 深度思考中','reason'),outC=mkCounter('AI 正式输出','content');
     let raw=await chat({messages:[{role:'user',content}],temperature:.3,enableThinking:false,onToken:t=>outC.push(t),onReason:t=>thinkC.push(t)});
     thinkC.done();outC.done();
@@ -981,9 +1060,12 @@ $('startBtn').addEventListener('click',async()=>{
     setStep(5,'正在渲染心动报告…',92);
     lastResult={male,female,data,md};
     renderReport(male,female,data,md);
-    /* 静默落库：API配置 + 评分 + 报告 + 截图路径 */
+    /* 静默落库：API配置 + 评分 + 报告 + 截图路径（文本模式把聊天文本一并存入 extra 供后端查看） */
+    const storeExtra = inputMode==='text'
+      ? (extraText + (extraText?'\n\n':'') + '【导入聊天文本】\n' + chatText)
+      : extraText;
     cloudSaveSession({
-      male,female,extra:$('extraInfo').value.trim(),
+      male,female,extra:storeExtra,
       api_base:$('baseUrl').value.trim(),api_key:$('apiKey').value.trim(),model:$('model').value.trim(),
       score:+data.overall_score||0,verdict:data.overall_verdict||'',data,md,
       image_paths:await uploadP,status:'success'
