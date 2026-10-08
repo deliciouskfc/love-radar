@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>暧昧指数测评 · Love Radar v2.1</title>
+<title>暧昧指数测评 · Love Radar v3.0</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
 :root{
@@ -551,6 +551,7 @@ footer{text-align:center;margin-top:56px;color:rgba(185,168,217,.5);font-size:12
 <div id="toast"></div>
 
 <script>
+console.log('%cLove Radar v3.0 loaded','color:#e879f9;font-weight:bold');
 /* ================= 星空背景 ================= */
 (function(){
   const c=document.getElementById('stars'),x=c.getContext('2d');let W,H,stars=[];
@@ -888,13 +889,21 @@ $('startBtn').addEventListener('click',async()=>{
 
     let data=parseJSON(raw);
     if(!data){ // 重试一次
-      termWriteSys('> 首次输出格式异常，要求 AI 重新输出纯 JSON…\n\n');
-      raw=await chat({messages:[{role:'user',content:[{type:'text',text:'你刚才的输出不是合法JSON。请只输出纯JSON对象：'+raw.slice(0,500)}]}],temperature:.2,onToken:termWriteContent,onReason:termWriteReason});
+      termWriteSys('> 首次输出非合法JSON，正在要求 AI 重新输出…\n');
+      termWriteSys('> [调试] 原始输出前 300 字：'+JSON.stringify(raw.slice(0,300))+'\n\n');
+      console.log('[debug] raw:', raw);
+      raw=await chat({messages:[{role:'user',content:[{type:'text',text:'你刚才的输出不是合法JSON（包含了多余文字或未转义字符）。请严格只输出一个纯JSON对象，不要任何其他说明、不要markdown。'}]}],temperature:.2,onToken:termWriteContent,onReason:termWriteReason});
       data=parseJSON(raw);
     }
-    if(!data||!Array.isArray(data.dimensions)||data.dimensions.length<10)
-      throw new Error('AI 返回的数据格式不正确，请换个模型再试（推荐 qwen-vl-max-latest）');
-    termWriteSys(`> 综合暧昧指数：${(+data.overall_score||0).toFixed(1)} 分\n> 15 个维度评分完成 [OK]\n`);
+    if(!data||!Array.isArray(data.dimensions)||data.dimensions.length===0){
+      termWriteSys('> [调试] 最终原始内容：'+JSON.stringify((raw||'').slice(0,800))+'\n');
+      console.log('[debug] final raw:', raw);
+      throw new Error('AI 返回的数据格式无法解析，请查看上方调试内容并反馈');
+    }
+    // 维度不足 15 个时仍可正常渲染，仅提示
+    if(data.dimensions.length<15)
+      termWriteSys(`> 注：AI 返回 ${data.dimensions.length} 个维度（应为 15），仍按实际维度渲染\n`);
+    termWriteSys(`> 综合暧昧指数：${(+data.overall_score||0).toFixed(1)} 分\n> ${data.dimensions.length} 个维度评分完成 [OK]\n`);
 
     // 4 长文报告
     setStep(4,'正在撰写两千字深度解读与攻略…（约需 20~60 秒）',65);
@@ -935,7 +944,8 @@ $('startBtn').addEventListener('click',async()=>{
 
 function parseJSON(text){
   if(!text||typeof text!=='string')return null;
-  text=text.trim();
+  // 清理零宽字符与 BOM（模型偶发输出，导致 JSON.parse 失败）
+  text=text.replace(/[\u200B-\u200D\uFEFF\u2060]/g,'').trim();
   try{return JSON.parse(text)}catch(e){}
   // ```json ... ``` 或 ``` ... ```
   const m=text.match(/```(?:json)?\s*([\s\S]*?)```/);
