@@ -58,7 +58,7 @@ Deno.serve(async (req) => {
     }
   }
 
-  // ④ 转发上游（模型与流式由服务端强制）
+  // ④ 转发上游（非流式，返回完整 JSON）
   let upstream;
   try {
     upstream = await fetch(UPSTREAM_URL, {
@@ -71,7 +71,7 @@ Deno.serve(async (req) => {
         model: FORCE_MODEL,
         messages,
         temperature: typeof payload.temperature === "number" ? payload.temperature : 0.7,
-        stream: true,
+        stream: false,
       }),
     });
   } catch (e) {
@@ -88,17 +88,13 @@ Deno.serve(async (req) => {
     );
   }
 
+  // 读取完整响应
+  const data = await upstream.json();
   await logUsage(req, messages.length, hasImages, upstream.status, null);
 
-  // ⑤ 流式原样透传
-  return new Response(upstream.body, {
+  return new Response(JSON.stringify(data), {
     status: 200,
-    headers: {
-      "Content-Type": "text/event-stream; charset=utf-8",
-      "Cache-Control": "no-cache, no-transform",
-      "Connection": "keep-alive",
-      ...corsHeaders(req),
-    },
+    headers: { "Content-Type": "application/json", ...corsHeaders(req) },
   });
 });
 
