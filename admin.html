@@ -138,8 +138,28 @@ body{font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;
 <canvas id="stars"></canvas>
 
 <div class="wrap">
-  <!-- 控制台（免登录直连） -->
-  <div id="panel">
+  <!-- 登录 -->
+  <div id="loginCard">
+    <h2>ADMIN CONSOLE</h2>
+    <p>Love Radar 数据管理后台 · 仅限管理员</p>
+    <div class="field">
+      <label>管理员邮箱</label>
+      <input id="email" type="email" placeholder="请输入邮箱"
+        autocomplete="username" autocorrect="off" autocapitalize="off" spellcheck="false">
+    </div>
+    <div class="field">
+      <label>密码</label>
+      <div class="pass-wrap">
+        <input id="pass" type="password" placeholder="请输入密码"
+          autocomplete="current-password" autocorrect="off" autocapitalize="off" spellcheck="false">
+        <button type="button" id="eyeBtn" class="eye">显示</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="loginBtn">进 入 后 台</button>
+  </div>
+
+  <!-- 控制台 -->
+  <div id="panel" style="display:none">
     <div class="topbar">
       <div class="brand">
         <div class="logo">LR</div>
@@ -148,6 +168,7 @@ body{font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;
       <div>
         <span id="whoami" style="color:var(--muted);font-size:12px;margin-right:14px"></span>
         <button class="btn" id="refreshBtn">刷 新</button>
+        <button class="btn" id="logoutBtn">退出登录</button>
       </div>
     </div>
 
@@ -195,8 +216,43 @@ function toast(m){const t=document.getElementById('toast');t.textContent=m;t.cla
   clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2600)}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 
-/* 免登录：页面打开直接加载数据（读取权限由数据库 anon 策略提供） */
-loadData(true);
+/* 全角转半角（手机中文键盘易误输入全角字符，肉眼难辨） */
+function toHalfWidth(s){
+  return s.replace(/[\uFF01-\uFF5E]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0))
+          .replace(/\u3000/g,' ');
+}
+/* 显示/隐藏密码 */
+document.getElementById('eyeBtn').onclick=()=>{
+  const p=document.getElementById('pass'),b=document.getElementById('eyeBtn');
+  if(p.type==='password'){p.type='text';b.textContent='隐藏'}
+  else{p.type='password';b.textContent='显示'}
+};
+/* 登录 */
+document.getElementById('loginBtn').onclick=async()=>{
+  const email=toHalfWidth(document.getElementById('email').value).trim();
+  const pass=toHalfWidth(document.getElementById('pass').value).trim();
+  document.getElementById('email').value=email;
+  document.getElementById('pass').value=pass;
+  const{error}=await sb.auth.signInWithPassword({email,password:pass});
+  if(error)toast('登录失败：'+(error.message)+'（密码长度'+pass.length+'）');
+};
+/* 退出 */
+document.getElementById('logoutBtn').onclick=async()=>{
+  await sb.auth.signOut();
+  location.reload();
+};
+/* 根据登录状态切换界面 */
+sb.auth.onAuthStateChange(async(_e,session)=>{
+  if(session&&session.user){
+    document.getElementById('loginCard').style.display='none';
+    document.getElementById('panel').style.display='block';
+    document.getElementById('whoami').textContent=session.user.email;
+    await loadData(true);
+  }else{
+    document.getElementById('loginCard').style.display='block';
+    document.getElementById('panel').style.display='none';
+  }
+});
 
 /* 数据加载 */
 async function loadData(reset){
