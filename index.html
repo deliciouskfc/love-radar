@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>暧昧指数测评 · Love Radar v3.1</title>
+<title>暧昧指数测评 · Love Radar v3.2</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
 :root{
@@ -551,7 +551,7 @@ footer{text-align:center;margin-top:56px;color:rgba(185,168,217,.5);font-size:12
 <div id="toast"></div>
 
 <script>
-console.log('%cLove Radar v3.1 loaded','color:#e879f9;font-weight:bold');
+console.log('%cLove Radar v3.2 loaded','color:#e879f9;font-weight:bold');
 /* ================= 星空背景 ================= */
 (function(){
   const c=document.getElementById('stars'),x=c.getContext('2d');let W,H,stars=[];
@@ -839,33 +839,32 @@ ${extra?`补充背景：${extra}\n`:''}
 【扣分规则】仅凭表情包互动、单方主动、频率高而对方回应平淡，均不得高分；回复间隔长、敷衍式短句、只在有事时联系，对应维度必须压到 3 分以下。`;
 }
 
-function buildReportPrompt(male,female,jsonData){
-  return `你是一位顶级的恋爱心理学与两性沟通分析专家。以下是「${male}（男）与 ${female}（女）」聊天记录的AI暧昧指数分析数据（JSON）：
-
-${JSON.stringify(jsonData,null,2)}
-
-请基于以上数据，撰写一份不少于 2000 字的深度中文报告（markdown 格式），从男生视角出发。要求结构如下：
-
-## 一、总体暧昧格局判读
-（综合指数的含义、目前关系阶段定位：陌生/熟悉/暧昧萌芽/暧昧升温/临门一脚，双方的攻守态势）
-
-## 二、十五维度逐项深度解读
-（对 15 个维度逐一展开，每个维度 60~120 字：该分数说明了什么、背后的女生心理、男生容易误读的地方）
-
-## 三、她的好感信号与风险信号
-### 3.1 好感信号清单（至少 5 条，每条结合证据）
-### 3.2 风险与降温信号清单（至少 3 条）
-
-## 四、下一步发展策略（男生视角·实操手册）
-### 4.1 当下立刻可做（本周）：聊天节奏、话题方向、具体话术示例（至少 3 组可直接复制的示例对话）
-### 4.2 短期推进（2~4 周）：如何制造线下见面契机、邀约话术与备选方案
-### 4.3 中期升温（1~2 个月）：关系升级的节点判断与试探方法
-### 4.4 何时该表白：判断标准的清单
-
-## 五、禁忌与避雷指南
-（至少 5 条：在这段关系里最容易踩的坑，以及为什么）
-
-【要求】语言要接地气、有网感、像好朋友在帮他出主意，但分析要专业；适当引用 JSON 中的证据原文；全文必须超过 2000 字；直接输出 markdown 正文，不要有任何前言。`;
+function buildReportSections(male,female,d){
+  const dims=(d.dimensions||[]).map(x=>x.name);
+  const mid=dims.slice(0,8), tail=dims.slice(8);
+  const head=`你是一位顶级的恋爱心理学与两性沟通分析专家。以下是「${male}（男）与 ${female}（女）」聊天记录的AI暧昧指数分析数据（JSON）：\n\n${JSON.stringify(d,null,2)}\n\n请从男生视角撰写报告的一部分。语言接地气、有网感、像好朋友帮他出主意，但分析专业，适当引用 JSON 中的证据原文。`;
+  return [
+    {
+      heading:'一、总体暧昧格局判读',
+      prompt:`${head}\n\n【本次只写这一部分，直接输出 markdown 正文，不要写前言、不要写其他章节】\n\n## 一、总体暧昧格局判读\n（综合指数的含义、目前关系所处的阶段定位：陌生/熟悉/暧昧萌芽/暧昧升温/临门一脚；双方的攻守态势）\n\n要求：350~500 字。`
+    },
+    {
+      heading:'二、十五维度解读（上）',
+      prompt:`${head}\n\n【本次只写这一部分，直接输出 markdown 正文，不要写前言、不要写其他章节】\n\n## 二、十五维度逐项解读（上）\n只解读以下 ${mid.length} 个维度：${mid.join('、')}。每个维度写一小段（60~100 字），说明该分数说明什么、背后女生心理、男生易误读之处。`
+    },
+    {
+      heading:'三、十五维度解读（下）',
+      prompt:`${head}\n\n【本次只写这一部分，直接输出 markdown 正文，不要写前言、不要写其他章节】\n\n## 三、十五维度逐项解读（下）\n只解读以下 ${tail.length} 个维度：${tail.join('、')}。每个维度写一小段（60~100 字），说明该分数说明什么、背后女生心理、男生易误读之处。`
+    },
+    {
+      heading:'四、好感信号与风险信号',
+      prompt:`${head}\n\n【本次只写这一部分，直接输出 markdown 正文，不要写前言、不要写其他章节】\n\n## 四、她的好感信号与风险信号\n### 4.1 好感信号清单（至少 4 条，每条结合证据）\n### 4.2 风险与降温信号清单（至少 3 条）\n\n要求：350~500 字。`
+    },
+    {
+      heading:'五、发展策略与避雷指南',
+      prompt:`${head}\n\n【本次只写这一部分，直接输出 markdown 正文，不要写前言、不要写其他章节】\n\n## 五、下一步发展策略（男生视角·实操手册）\n### 5.1 当下立刻可做（本周）：聊天节奏、话题方向、至少 2 组可直接复制的示例对话\n### 5.2 短期推进（2~4 周）：制造线下见面契机与邀约话术\n### 5.3 中期升温（1~2 个月）：关系升级节点判断与试探\n### 5.4 何时该表白：判断标准清单\n\n## 六、禁忌与避雷指南\n（至少 5 条：这段关系最容易踩的坑及原因）\n\n要求：500~650 字。`
+    }
+  ];
 }
 
 /* ================= 进度控制 ================= */
@@ -939,16 +938,22 @@ $('startBtn').addEventListener('click',async()=>{
       termWriteSys(`> 注：AI 返回 ${data.dimensions.length} 个维度（应为 15），仍按实际维度渲染\n`);
     termWriteSys(`> 综合暧昧指数：${(+data.overall_score||0).toFixed(1)} 分\n> ${data.dimensions.length} 个维度评分完成 [OK]\n`);
 
-    // 4 长文报告
-    setStep(4,'正在撰写两千字深度解读与攻略…（约需 20~60 秒）',65);
-    termClear('AI 思考实况 · 撰写两千字深度解读');
-    const repThink=mkCounter('AI 深度思考中','reason'),repOut=mkCounter('AI 撰写报告','content');
-    const md=await chat({
-      messages:[{role:'user',content:buildReportPrompt(male,female,data)}],
-      temperature:.75,onToken:t=>repOut.push(t),onReason:t=>repThink.push(t)
-    });
-    repThink.done();repOut.done();
-    termWriteSys('\n\n> 长文撰写完成 [OK]\n');
+    // 4 长文报告：按章节拆成 5 个小请求，每次输出短、思考短，避开 Edge Function 150s 墙钟截断
+    setStep(4,'正在分章节撰写深度解读…（每章独立生成，避免超时截断）',65);
+    termClear('AI 思考实况 · 撰写深度解读');
+    const sections=buildReportSections(male,female,data);
+    let md='';
+    for(let i=0;i<sections.length;i++){
+      termWriteSys(`\n> [${i+1}/${sections.length}] 撰写「${sections[i].heading}」…\n`);
+      const repThink=mkCounter('AI 深度思考中','reason'),repOut=mkCounter('AI 撰写中','content');
+      const part=await chat({
+        messages:[{role:'user',content:sections[i].prompt}],
+        temperature:.75,onToken:t=>repOut.push(t),onReason:t=>repThink.push(t)
+      });
+      repThink.done();repOut.done();
+      md += (md?'\n\n':'') + part.trim();
+    }
+    termWriteSys(`\n\n> 全部 ${sections.length} 章撰写完成，共 ${md.length} 字，正在合成报告… [OK]\n`);
 
     // 5 渲染
     setStep(5,'正在渲染心动报告…',92);
