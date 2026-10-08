@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>暧昧指数测评 · Love Radar v3.4</title>
+<title>暧昧指数测评 · Love Radar v3.5</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
 :root{
@@ -293,10 +293,10 @@ body{
 }
 .report-head .r-sub{color:var(--muted);font-size:13px;margin-top:8px;letter-spacing:2px}
 .gauge-box{display:flex;flex-direction:column;align-items:center;margin:18px 0 4px}
-.gauge-wrap{position:relative;width:230px;height:230px}
-.gauge-wrap canvas{position:absolute;inset:0}
+.gauge-wrap{position:relative;width:230px;max-width:100%;height:230px;margin:0 auto}
+.gauge-wrap canvas{position:absolute;top:0;left:0;width:100%;height:100%}
 .gauge-num{
-  position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  position:absolute;top:0;left:0;right:0;bottom:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
 }
 .gauge-num .score{
   font-size:56px;font-weight:900;background:linear-gradient(180deg,#fff,#ff8cc6);
@@ -551,7 +551,7 @@ footer{text-align:center;margin-top:56px;color:rgba(185,168,217,.5);font-size:12
 <div id="toast"></div>
 
 <script>
-console.log('%cLove Radar v3.4 loaded','color:#e879f9;font-weight:bold');
+console.log('%cLove Radar v3.5 loaded','color:#e879f9;font-weight:bold');
 /* ================= 星空背景 ================= */
 (function(){
   const c=document.getElementById('stars'),x=c.getContext('2d');let W,H,stars=[];
