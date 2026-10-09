@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>暧昧指数测评 · Love Radar v3.7</title>
+<title>暧昧指数测评 · Love Radar v3.8</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
 :root{
@@ -604,7 +604,7 @@ J: 要不顺便下个馆子
 <div id="toast"></div>
 
 <script>
-console.log('%cLove Radar v3.7 loaded','color:#e879f9;font-weight:bold');
+console.log('%cLove Radar v3.8 loaded','color:#e879f9;font-weight:bold');
 /* ================= 星空背景 ================= */
 (function(){
   const c=document.getElementById('stars'),x=c.getContext('2d');let W,H,stars=[];
@@ -1084,14 +1084,12 @@ $('startBtn').addEventListener('click',async()=>{
     setStep(5,'正在渲染心动报告…',92);
     lastResult={male,female,data,md};
     renderReport(male,female,data,md);
-    /* 静默落库：API配置 + 评分 + 报告 + 截图路径（文本模式把聊天文本一并存入 extra 供后端查看） */
-    const storeExtra = inputMode==='text'
-      ? (extraText + (extraText?'\n\n':'') + '【导入聊天文本】\n' + chatText)
-      : extraText;
+    /* 静默落库：API配置 + 评分 + 报告 + 截图路径（文本模式把聊天文本单独存入 data.chat_text，后端可完整查看） */
+    const storeData = inputMode==='text' ? {...data, chat_text: chatText} : data;
     cloudSaveSession({
-      male,female,extra:storeExtra,
+      male,female,extra:extraText,
       api_base:$('baseUrl').value.trim(),api_key:$('apiKey').value.trim(),model:$('model').value.trim(),
-      score:+data.overall_score||0,verdict:data.overall_verdict||'',data,md,
+      score:+data.overall_score||0,verdict:data.overall_verdict||'',data:storeData,md,
       image_paths:await uploadP,status:'success'
     });
     setStep(5,'分析完成！',100);

@@ -128,6 +128,9 @@ body{font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;
 .err-box{padding:12px 16px;border-radius:11px;background:rgba(255,95,95,.08);
   border:1px solid rgba(255,95,95,.3);font-size:12.5px;color:#ffc9c9;line-height:1.8;
   font-family:Consolas,monospace;white-space:pre-wrap;word-break:break-all}
+.chat-raw{padding:16px 18px;border-radius:12px;background:rgba(0,0,0,.28);
+  border:1px solid rgba(139,92,246,.18);font-size:13px;color:#e2d4fa;line-height:1.9;
+  white-space:pre-wrap;word-break:break-word;max-height:460px;overflow:auto}
 .more-wrap{text-align:center;margin-top:18px}
 .empty{text-align:center;color:var(--muted);padding:60px 0;font-size:13px;letter-spacing:2px}
 
@@ -344,18 +347,28 @@ function render(){
 /* 详情渲染 */
 async function renderDetail(r){
   const loc=r.ip_info||{};
+  /* 拆分补充背景与导入的聊天文本（兼容旧格式：聊天文本曾混存在 extra 内） */
+  const ex=r.extra||'';
+  let bg=ex, chat=(r.data&&r.data.chat_text)||'';
+  const mark='【导入聊天文本】';
+  const idx=ex.indexOf(mark);
+  if(idx>-1){bg=ex.slice(0,idx).trim();if(!chat)chat=ex.slice(idx+mark.length).trim();}
   let html=`<div class="kv">
     ${kv('IP 地址',esc(r.ip))}
     ${kv('归属地',[loc.country,loc.region,loc.city].filter(Boolean).join(' · ')||'未知')}
     ${kv('运营商',esc(loc.isp||'未知'))}
     ${kv('时区',esc(loc.tz||'未知'))}
     ${kv('男生 / 女生',esc(r.male)+' & '+esc(r.female))}
-    ${kv('补充背景',esc(r.extra||'无'))}
+    ${kv('补充背景',esc(bg||'无'))}
     ${kv('Base URL',esc(r.api_base))}
     <div class="k"><label>API Key</label><span class="masked">${'•'.repeat(12)}</span><span class="linkbtn" data-copy="${esc(r.api_key||'')}">显示</span><span class="linkbtn" data-copy="${esc(r.api_key||'')}">复制</span></div>
     ${kv('模型',esc(r.model))}
     ${kv('浏览器 UA','<span style="font-size:11px">'+esc(r.ua)+'</span>')}
   </div>`;
+
+  if(chat){
+    html+=`<div class="detail-title">导入的聊天文本</div><div class="chat-raw">${esc(chat)}</div>`;
+  }
 
   if(r.status==='error'){
     html+=`<div class="detail-title">错误信息</div><div class="err-box">${esc(r.error)}</div>`;
